@@ -1,0 +1,15 @@
+# Папки окружения и IDE
+.env/
+.idea/
+.vscode/
+__pycache__/
+*.pyc
+*.pyo
+
+# Логи и данные
+/logs/
+/data/
+
+# Секретные данные
+*.env
+*.key
