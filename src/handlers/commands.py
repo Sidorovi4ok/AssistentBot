@@ -10,6 +10,7 @@ from src.handlers.help      import help_handler
 from src.handlers.info      import info_handler
 from src.handlers.settings  import settings_handler
 from src.handlers.about     import about_handler
+from src.handlers.role      import role_handler
 
 # Импортируем обработчики команд, связанных с запросами
 from src.handlers.request   import (
@@ -30,12 +31,13 @@ def register_handlers(dp: Dispatcher):
     """
 
     # Регистрация текстовых команд
-    dp.message.register(start_handler, Command(commands=["start"]))
-    dp.message.register(request_handler, Command(commands=["request"]))
-    dp.message.register(help_handler, Command(commands=["help"]))
-    dp.message.register(info_handler, Command(commands=["info"]))
-    dp.message.register(settings_handler, Command(commands=["settings"]))
-    dp.message.register(about_handler, Command(commands=["about"]))
+    dp.message.register(start_handler,     Command(commands=["start"]))
+    dp.message.register(request_handler,   Command(commands=["request"]))
+    dp.message.register(role_handler,     Command(commands=["role"]))
+    dp.message.register(help_handler,      Command(commands=["help"]))
+    dp.message.register(info_handler,      Command(commands=["info"]))
+    dp.message.register(settings_handler,  Command(commands=["settings"]))
+    dp.message.register(about_handler,     Command(commands=["about"]))
 
     # Регистрация обработчика для получения запросов в состоянии ожидания ввода
     dp.message.register(receive_request, RequestStates.waiting_for_request)

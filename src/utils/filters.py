@@ -9,8 +9,10 @@
 
 # Импорт необходимых библиотек для обработки текста
 import re
+from aiogram import types
 from nltk.corpus import stopwords
 
+from config import ALLOWED_MANAGERS
 
 # Функция для извлечения ключевого слова из запроса
 def filter_article_extract(query: str) -> str:
@@ -96,3 +98,19 @@ def filter_product_name(query: str) -> str:
     # Формируем финальный результат с префиксом перед наименованием товара
     prefix = " ".join(collected).strip()
     return f"{prefix} «{quoted_text}»" if prefix else f"«{quoted_text}»"
+
+
+async def filter_only_manager(message: types.Message) -> bool:
+
+    """
+    Фильтр для доступа только менеджерам.
+
+    Возвращает:
+    - False: Если пользователя нет в списке менеджеров
+    - True: Если пользователь есть в списке менеджеров.
+    """
+
+    if message.from_user.id not in ALLOWED_MANAGERS:
+        return False
+    return True
+

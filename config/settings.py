@@ -25,3 +25,6 @@ BOT_TAG   = os.getenv("BOT_TAG")    # @username бота в Telegram
 
 # Файл с данными (например, список товаров)
 DATA_FILE = os.getenv("DATA_FILE")
+
+# ID менеджеров в телеграме
+ALLOWED_MANAGERS = [804676300, 1900362240]

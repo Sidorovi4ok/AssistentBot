@@ -19,7 +19,7 @@
 from .logger import logger  # Логирование с настройкой через logger
 from .manager import DataManager  # Менеджер данных для работы с Excel и базой данных
 from .search import VectorSearchManager  # Поиск по векторным представлениям (FAISS)
-from .filters import filter_article_extract, filter_product_name  # Фильтры для обработки запросов
+from .filters import filter_article_extract, filter_product_name, filter_only_manager  # Фильтры для обработки запросов
 
 # Определяем список объектов, которые будут доступны при импорте пакета.
-__all__ = ["logger", "DataManager", "VectorSearchManager", "filter_article_extract", "filter_product_name"]
+__all__ = ["logger", "DataManager", "VectorSearchManager", "filter_article_extract", "filter_product_name", "filter_only_manager"]
