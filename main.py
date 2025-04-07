@@ -11,7 +11,10 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 # Локальные модули
 from src.handlers import register_handlers
-from src.utils import logger, DataManager
+from src.managers import DataManager, UserManager
+from src.utils import logger
+
+
 
 # Конфигурационные данные
 from config import BOT_TOKEN, DATA_FILE
@@ -51,6 +54,7 @@ async def main():
     Исключения и завершение работы обрабатываются в блоке finally для корректного закрытия сессии.
     """
     dm = DataManager.initialize(DATA_FILE)  # Инициализация менеджера данных
+    um = UserManager()                      # Инициализация менеджера пользователей
 
     bot = Bot(
         token=BOT_TOKEN,
@@ -59,6 +63,7 @@ async def main():
         )
     )
     bot.data_manager = dm  # Добавляем менеджер данных в объект бота
+    bot.user_manager = um  # Добавляем менеджер данных в объект бота
 
     dp = Dispatcher(storage=MemoryStorage())  # Создаем диспетчер с хранилищем FSM в памяти
     register_handlers(dp)  # Регистрируем обработчики команд и сообщений

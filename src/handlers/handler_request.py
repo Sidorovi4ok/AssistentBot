@@ -1,6 +1,6 @@
 
 """
-request.py
+handler_request.py
 
 Этот модуль содержит обработчики команд, связанных с запросами товаров.
 Бот позволяет пользователям выбирать таблицу, приоритет поиска и находить товары по заданному запросу.
@@ -8,26 +8,19 @@ request.py
 
 # Импортируем необходимые модули
 import requests
-import pandas as pd
 
 # Импортируем необходимые классы из библиотеки aiogram для обработки сообщений.
 from aiogram import types
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # Импортируем утилиты и менеджеры
 from src.utils.logger import logger
-from src.utils.manager import DataManager
 from src.utils.search import VectorSearchManager
-from src.utils.filters import filter_article_extract, filter_product_name
+from src.filters import filter_article, filter_product_name
 
-
-class RequestStates(StatesGroup):
-    """Класс состояний FSM для управления процессом запроса."""
-    choosing_list       = State()  # Выбор таблицы
-    waiting_for_request = State()  # Ожидание ввода поискового запроса
+from src.states import RequestStates
 
 
 async def request_handler(message: types.Message, state: FSMContext):
@@ -96,7 +89,7 @@ async def receive_request(message: types.Message, state: FSMContext):
     # Создаем экземпляр поиска по векторным эмбеддингам
     vector_search = VectorSearchManager(data_manager, table_name=choosing_list, text_column=priority)
 
-    search_query = filter_article_extract(message.text) if priority == "Артикул" else filter_product_name(message.text)
+    search_query = filter_article(message.text) if priority == "Артикул" else filter_product_name(message.text)
     logger.info(f"Запрос для эмбеддингов: {search_query}")
 
     # Выполняем поиск по запросу пользователя

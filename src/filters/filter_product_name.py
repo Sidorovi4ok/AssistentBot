@@ -1,40 +1,7 @@
-"""
-Модуль для обработки запросов и извлечения информации о товарах.
-
-Описание:
-1. Функция `filter_article_extract` используется для извлечения статьи или ключевой фразы из запроса.
-2. Функция `filter_product_name` извлекает наименование товара из запроса, игнорируя стоп-слова и обрабатывая кавычки.
-3. В модуле также загружается список стоп-слов, который комбинирует стандартные русские стоп-слова из NLTK и кастомный список.
-"""
-
 # Импорт необходимых библиотек для обработки текста
 import re
-from aiogram import types
 from nltk.corpus import stopwords
 
-from config import ALLOWED_MANAGERS
-
-# Функция для извлечения ключевого слова из запроса
-def filter_article_extract(query: str) -> str:
-    """
-    Извлекает первую ключевую фразу (или артикул) из строки запроса.
-
-    Аргументы:
-    - query (str): Строка запроса пользователя.
-
-    Возвращает:
-    - str: Извлеченная фраза или пустая строка, если фраза не найдена.
-    """
-    # Используем регулярное выражение для поиска ключевой фразы (слова с дефисами)
-    pattern = r'\b([\wА-Яа-яЁё]+(?:-[\wА-Яа-яЁё]+)+)\b'
-    match = re.search(pattern, query, re.IGNORECASE)
-    if match:
-        return match.group(1)
-    return ""
-
-
-# Загружаем список стоп-слов из NLTK, если это еще не сделано
-# nltk.download('stopwords')
 
 # Стандартный русский список стоп-слов из библиотеки NLTK
 russian_stopwords = set(stopwords.words('russian'))
@@ -98,19 +65,3 @@ def filter_product_name(query: str) -> str:
     # Формируем финальный результат с префиксом перед наименованием товара
     prefix = " ".join(collected).strip()
     return f"{prefix} «{quoted_text}»" if prefix else f"«{quoted_text}»"
-
-
-async def filter_only_manager(message: types.Message) -> bool:
-
-    """
-    Фильтр для доступа только менеджерам.
-
-    Возвращает:
-    - False: Если пользователя нет в списке менеджеров
-    - True: Если пользователь есть в списке менеджеров.
-    """
-
-    if message.from_user.id not in ALLOWED_MANAGERS:
-        return False
-    return True
-
