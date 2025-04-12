@@ -1,4 +1,3 @@
-
 """
 handler_request.py
 
@@ -16,9 +15,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # Импортируем утилиты и менеджеры
-from src.utils.logger import logger
-from src.utils.search import VectorSearchManager
-from src.filters import filter_article, filter_product_name
+from src.utils import logger, SearchService
 
 from src.states import RequestStates
 
@@ -35,7 +32,8 @@ async def request_handler(message: types.Message, state: FSMContext):
 
     # Создаем inline-клавиатуру с таблицами
     list_keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
+        inline_keyboard=
+        [
             [InlineKeyboardButton(text=sheet_name, callback_data=f"sheet_{sheet_name}")]
             for sheet_name in lists
         ] + [
@@ -63,7 +61,6 @@ async def receive_request(message: types.Message, state: FSMContext):
     user_data = await state.get_data()
     request_message_id = user_data.get("request_message_id")
     choosing_list = user_data.get("choosing_list")
-    priority = user_data.get("search_priority")
 
     data_manager = message.bot.data_manager
     data_frame = data_manager.get_table_data(choosing_list)
@@ -86,17 +83,23 @@ async def receive_request(message: types.Message, state: FSMContext):
     # Очищаем состояние
     await state.clear()
 
-    # Создаем экземпляр поиска по векторным эмбеддингам
-    vector_search = VectorSearchManager(data_manager, table_name=choosing_list, text_column=priority)
+    rasa_manager = message.bot.rasa_manager
+    emb_manager  = message.bot.embedding_manager
+    search_service = SearchService(data_manager, rasa_manager)
+    result = search_service.search_smart(message.text, choosing_list, emb_manager)
 
-    search_query = filter_article(message.text) if priority == "Артикул" else filter_product_name(message.text)
-    logger.info(f"Запрос для эмбеддингов: {search_query}")
 
-    # Выполняем поиск по запросу пользователя
-    results, distances = vector_search.search(search_query, top_k=3)
+    print("\n🔍 Результаты:")
+    if result.empty:
+        print("Ничего не найдено")
+    else:
+        # Обеспечим наличие ключевых колонок для вывода
+        for col in ['Артикул', 'Наименование', 'Описание', 'similarity', 'search_column']:
+            if col not in result:
+                result[col] = None
+        print(result)
 
-    # Преобразуем результаты в JSON
-    filtered_data = results.to_json(orient="records", force_ascii=False)
+
 
     # Запрос к API для генерации ответа
     url = "https://api.intelligence.io.solutions/api/v1/chat/completions"
@@ -116,43 +119,43 @@ async def receive_request(message: types.Message, state: FSMContext):
                         Ты бот-ассистент для работы с товарами.
                         Проанализируй предоставленные данные о товаре и оформи ответ **точно по шаблону ниже**. 
                         Выделяй ключевые параметры (цены, наличие, особенности), используй чёткие разделы и маркированные списки. Избегай сплошного текста. 
-    
+
                         **Шаблон:**  
                         **Конкретный ответ на запрос пользователя/клиента**  
-                        
+
                         1. **Название товара**  
                            - [Название]  
                            - **Категория/Тематика**: [если указана]  
-                        
+
                         2. **Цены**  
                            - **Базовая цена**: [значение] (выдели жирным)  
                            - **Цена с НДС**: [значение]  
                            - **РРЦ (Рек. розничная цена)**: [значение]  
                            - **Акции/Скидки**: [если есть, иначе "Не указаны"]  
-                        
+
                         3. **Характеристики**  
                            - [Параметр 1]: [значение]  
                            - [Параметр 2]: [значение]  
                            - ...  
-                        
+
                         4. **Наличие**  
                            - **На складе**: [Доступно/Нет в наличии/Требует уточнения]  
-                        
+
                         5. **Ключевые особенности**  
                            - [Фраза 1]  
                            - [Фраза 2]  
-                        
+
                         6. **Рекомендации**  
                            - **Сопутствующие товары**: [Список с названиями и артикулами]  
                            - **Альтернативы**: [Название, цена, преимущество]  
-                        
+
                         **Важно:**  
                         - Числовые значения (цены, размеры) выделяй жирным.  
                         - Если данные отсутствуют, пиши "Нет информации" или "Требует уточнения".  
                         - Сохраняй лаконичность.  
                     '''
                     +
-                        f"Используй только предоставленные данные: {filtered_data}."
+                    f"Используй только предоставленные данные: {result}."
             },
             {
                 "role": "user",
@@ -160,7 +163,6 @@ async def receive_request(message: types.Message, state: FSMContext):
             }
         ],
     }
-
 
     response = requests.post(url, headers=headers, json=data)
     data = response.json()
@@ -183,10 +185,6 @@ async def tables_callback_handler(callback_query: types.CallbackQuery, state: FS
         # Клавиатура с приоритетом поиска
         priority_keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [
-                InlineKeyboardButton(text="Артикул", callback_data="priority_Артикул"),
-                InlineKeyboardButton(text="Наименование", callback_data="priority_Наименование")
-            ],
-            [
                 InlineKeyboardButton(text="Отменить", callback_data="cancel_")
             ]
         ])
@@ -194,36 +192,12 @@ async def tables_callback_handler(callback_query: types.CallbackQuery, state: FS
         # Обновляем сообщение
         await callback_query.message.edit_text(
             f"✅ Выбрана категория: {chosen_list}\n\n"
-            "Пожалуйста, выберите поле для точного поиска:",
+            "📝 Теперь введите ваш поисковый запрос:",
             reply_markup=priority_keyboard
         )
 
         # Сохраняем выбор в состоянии
         await state.update_data(choosing_list=chosen_list)
-        await callback_query.answer()
-
-
-async def search_priority_callback_handler(callback_query: types.CallbackQuery, state: FSMContext):
-    """
-    Обработчик выбора приоритета поиска (Артикул / Наименование).
-    Запрашивает у пользователя ввод поискового запроса.
-    """
-    if callback_query.data.startswith("priority_"):
-        priority = callback_query.data.split("_", 1)[1]
-        logger.info(f"Search priority selected: {priority}")
-
-        # Обновляем сообщение
-        await callback_query.message.edit_text(
-            callback_query.message.text + f"\n\nВыбран приоритет поиска: {priority}\n\n"
-                                          "📝 Теперь введите ваш поисковый запрос:\n\n"
-                                          "<i>Примечание для точного поиска:</i>\n"
-                                          "<i>Артикул: запрос должен содержать точный артикул (XXXX-XXXX)</i>\n"
-                                          "<i>Наименовние: запрос должен содержать название товара в кавычках (\"Название\")</i>",
-            reply_markup=None
-        )
-
-        # Сохраняем приоритет поиска
-        await state.update_data(search_priority=priority)
         await state.set_state(RequestStates.waiting_for_request)
         await callback_query.answer()
 

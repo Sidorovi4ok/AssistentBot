@@ -16,7 +16,9 @@
 # Импортируем необходимые модули для логирования, работы с данными и поиска
 from .logger import logger  # Логирование с настройкой через logger
 
-from .search import VectorSearchManager  # Поиск по векторным представлениям (FAISS)
+from .search import SearchService  # Поиск по векторным представлениям (FAISS)
+
+from .preprocessor import TextPreprocessor
 
 # Определяем список объектов, которые будут доступны при импорте пакета.
-__all__ = ["logger", "VectorSearchManager"]
+__all__ = ["logger", "TextPreprocessor", "SearchService"]

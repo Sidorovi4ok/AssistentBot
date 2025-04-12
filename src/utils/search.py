@@ -1,105 +1,92 @@
-import os
 import numpy as np
-import faiss
+import pandas as pd
+pd.options.mode.chained_assignment = None
+
 from sentence_transformers import SentenceTransformer
-import hashlib
+from thefuzz import fuzz
 
-class VectorSearchManager:
-    def __init__(self, data_manager, table_name, text_column, base_dir="data/indexes"):
-        """
-        Инициализация менеджера поиска по векторным эмбеддингам.
+from src.utils.preprocessor import TextPreprocessor
 
-        Аргументы:
-        - data_manager (DataManager): Экземпляр класса DataManager для работы с данными.
-        - table_name (str): Имя таблицы для загрузки данных.
-        - text_column (str): Столбец с текстовыми данными, по которому будет осуществляться поиск.
-        - base_dir (str, optional): Базовая директория для сохранения файлов индексов и эмбеддингов.
-        """
-        self.data_manager = data_manager
-        self.table_name = table_name
-        self.text_column = text_column
-        self.base_dir = base_dir
+class SearchService:
+    """Сервис для семантического и 'умного' поиска по таблицам."""
+    def __init__(self, data_manager, rasa_client):
+        self.dm = data_manager
+        self.rasa_client = rasa_client
+        self.model = SentenceTransformer("sberbank-ai/sbert_large_nlu_ru")
+        self.preproc = TextPreprocessor()
 
-        # Создание уникальных путей для файлов
-        self.index_path, self.embeddings_path = self._generate_paths()
+        def __init__(self, base_path="data/embeddings"):
+            self.base_path = base_path
 
-        # Загружаем данные из базы
-        self.df = self.data_manager.get_table_data(table_name)
+    def search_in_single_column(self, query, table, column, emb_manager, top_k=5):
+        print(f"[🔎] Поиск в '{column}' по: '{query}'")
+        df = self.dm.get_table_data(table).copy()
+        df['clean_article'] = df['Артикул'].astype(str).str.lower().str.strip()
 
-        # Инициализация модели эмбеддингов
-        self.model = SentenceTransformer("distiluse-base-multilingual-cased-v2")
+        # Если ищем по артикулам – пытаемся извлечь сущности от Rasa
+        if column == "Артикул":
+            entities = self.rasa_client.extract_entities(query)
+            article = entities.get("artikul")
+            if article:
+                match = df[df['clean_article'] == article.lower()]
+                if not match.empty:
+                    match['similarity'] = 1.0
+                    match['search_column'] = 'Артикул'
+                    return match.head(top_k)
+                partial = df[df['clean_article'].str.contains(article.lower())]
+                if not partial.empty:
+                    partial['similarity'] = 0.9
+                    partial['search_column'] = 'Артикул'
+                    return partial.head(top_k)
 
-        # Флаги загрузки
-        index_loaded = False
-        embeddings_loaded = False
+        # Семантический поиск: предобработка, получение эмбеддингов и поиск через Faiss
+        cleaned = self.preproc.preprocess(query, column == "Артикул")
+        q_emb = self.model.encode([cleaned])[0]
+        q_emb /= np.linalg.norm(q_emb)
+        distances, indices = emb_manager.search(table, column, q_emb, top_k)
+        if distances is None:
+            return pd.DataFrame()
+        res = df.iloc[indices].copy()
+        res["similarity"], res["search_column"] = distances, column
+        return res
 
-        # Загрузка сохранённых эмбеддингов (если файл существует)
-        if os.path.exists(self.embeddings_path):
+    def search_smart(self, query, table, emb_manager, top_k=5):
+        res = self.rasa_client.query(query) or {}
+        entities, intent = res.get("entities", {}), res.get("intent", "unknown")
+        df = self.dm.get_table_data(table).copy()
+        df['clean_article'] = df['Артикул'].astype(str).str.lower().str.strip()
+
+        # Если есть сущность artikul, пытаемся точное и нечеткое совпадения
+        if "artikul" in entities:
+            article = entities["artikul"]
+            match = df[df['clean_article'] == article.lower()]
+            if not match.empty:
+                match['similarity'] = 1.0
+                match['search_column'] = 'Артикул'
+                return match.head(top_k)
+            df['fuzzy_score'] = df['clean_article'].apply(lambda x: fuzz.ratio(x, article.lower()))
+            fuzzy = df[df['fuzzy_score'] > 70].sort_values('fuzzy_score', ascending=False).head(top_k)
+            if not fuzzy.empty:
+                fuzzy['similarity'] = fuzzy['fuzzy_score'] / 100
+                fuzzy['search_column'] = 'Артикул'
+                return fuzzy
+
+        # Если сущность naimenovanie есть, запускаем поиск по колонке "Наименование"
+        if "naimenovanie" in entities:
+            return self.search_in_single_column(entities["naimenovanie"], table, "Наименование", emb_manager, top_k)
+
+        # Если определено намерение – выбираем колонку в зависимости от типа поиска
+        if intent in ["search_by_artikul", "search_by_naimenovanie"]:
+            column = "Артикул" if intent == "search_by_artikul" else "Наименование"
+            return self.search_in_single_column(query, table, column, emb_manager, top_k)
+
+        print("[⚠] Fallback: семантический поиск по всем колонкам")
+        results = []
+        for col in ["Наименование", "Описание", "Артикул"]:
             try:
-                self.embeddings = np.load(self.embeddings_path)
-                embeddings_loaded = True
-                print(f"Загружены эмбеддинги из {self.embeddings_path}")
+                results.append(self.search_in_single_column(query, table, col, emb_manager, top_k))
             except Exception as e:
-                print(f"Ошибка при загрузке эмбеддингов: {e}")
-
-        # Вычисление эмбеддингов, если файл отсутствует
-        if not embeddings_loaded:
-            texts = self.df[self.text_column].tolist()
-            print("Вычисление эмбеддингов...")
-            self.embeddings = self.model.encode(texts, show_progress_bar=True)
-            self.embeddings = np.array(self.embeddings, dtype=np.float32)
-            np.save(self.embeddings_path, self.embeddings)
-            print(f"Эмбеддинги сохранены в {self.embeddings_path}")
-
-        # Загрузка индекса (если файл существует)
-        if os.path.exists(self.index_path):
-            try:
-                self.index = faiss.read_index(self.index_path)
-                index_loaded = True
-                print(f"Загружен индекс из {self.index_path}")
-            except Exception as e:
-                print(f"Ошибка при загрузке индекса: {e}")
-
-        # Создание индекса, если файл отсутствует или загрузка не удалась
-        if not index_loaded:
-            self.dimension = self.embeddings.shape[1]
-            self.index = faiss.IndexFlatL2(self.dimension)
-            self.index.add(self.embeddings)
-            faiss.write_index(self.index, self.index_path)
-            print(f"Индекс создан и сохранён в {self.index_path}")
-
-    def _normalize_filename(self, name):
-        """
-        Генерирует хэш md5 для переданной строки.
-        """
-        encoded_name = name.encode("utf-8")
-        return hashlib.md5(encoded_name).hexdigest()
-
-    def _generate_paths(self):
-        """
-        Генерирует пути для файлов эмбеддингов и индекса, используя только хэш от (table_name + text_column).
-        """
-        os.makedirs(self.base_dir, exist_ok=True)
-        filename_hash = self._normalize_filename(f"{self.table_name}_{self.text_column}")
-        index_path = os.path.join(self.base_dir, f"{filename_hash}_index.faiss")
-        embeddings_path = os.path.join(self.base_dir, f"{filename_hash}_embeddings.npy")
-        return index_path, embeddings_path
-
-    def search(self, query, top_k=5):
-        """
-        Выполняет поиск по запросу и возвращает top_k наиболее релевантных записей.
-
-        Аргументы:
-        - query (str): Текстовый запрос для поиска.
-        - top_k (int): Количество наиболее релевантных записей для возврата.
-
-        Возвращает:
-        - results (DataFrame): Найденные записи из таблицы.
-        - distances (ndarray): Расстояния для найденных записей.
-        """
-        query_embedding = self.model.encode([query])
-        query_embedding = np.array(query_embedding, dtype=np.float32)
-
-        distances, indices = self.index.search(query_embedding, top_k)
-        results = self.df.iloc[indices[0]]
-        return results, distances[0]
+                print(f"[⚠] Ошибка в колонке {col}: {e}")
+        if results:
+            return pd.concat(results).sort_values("similarity", ascending=False).drop_duplicates("Артикул").head(top_k)
+        return pd.DataFrame()

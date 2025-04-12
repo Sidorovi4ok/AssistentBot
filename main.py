@@ -2,6 +2,7 @@
 
 # Стандартные библиотеки
 import asyncio
+import requests
 
 # Сторонние библиотеки
 from aiogram import Bot, Dispatcher
@@ -11,8 +12,9 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 # Локальные модули
 from src.handlers import register_handlers
-from src.managers import DataManager, UserManager
+from src.managers import DataManager, UserManager, EmbeddingManager
 from src.utils import logger
+from src.services.rasa.client import RasaClient
 
 
 
@@ -54,7 +56,13 @@ async def main():
     Исключения и завершение работы обрабатываются в блоке finally для корректного закрытия сессии.
     """
     dm = DataManager.initialize(DATA_FILE)  # Инициализация менеджера данных
+    em = EmbeddingManager(dm)               # Инициализация менеджера
     um = UserManager()                      # Инициализация менеджера пользователей
+    rc = RasaClient()                       # Инициализация клиена для работы с моделью rasa
+
+    if not rc.is_available:
+        print("[❌] Rasa недоступен. Убедитесь, что API работает:", rc.api_url)
+        return
 
     bot = Bot(
         token=BOT_TOKEN,
@@ -62,8 +70,11 @@ async def main():
             parse_mode=ParseMode.HTML,  # Используем HTML-разметку в сообщениях
         )
     )
-    bot.data_manager = dm  # Добавляем менеджер данных в объект бота
-    bot.user_manager = um  # Добавляем менеджер данных в объект бота
+
+    bot.data_manager      = dm  # Добавляем менеджер данных в объект бота
+    bot.user_manager      = um  # Добавляем менеджер данных в объект бота
+    bot.rasa_manager      = rc  # Добавляем клиена для работы с моделью rasa
+    bot.embedding_manager = em  # Добавляем клиена для работы с моделью rasa
 
     dp = Dispatcher(storage=MemoryStorage())  # Создаем диспетчер с хранилищем FSM в памяти
     register_handlers(dp)  # Регистрируем обработчики команд и сообщений
@@ -71,11 +82,16 @@ async def main():
 
     try:
         logger.info("Starting polling")  # Логируем запуск поллинга
-        await dp.start_polling(bot)
+        await dp.start_polling(bot)  # Запускаем поллинг
     except KeyboardInterrupt:
-        pass
+        # Если было нажатие Ctrl+C, просто игнорируем и завершаем
+        logger.info("Bot stopped by user (Ctrl+C)")
+    except asyncio.CancelledError:
+        # В случае отмены задачи asyncio
+        logger.info("Polling was cancelled")
     finally:
-        await bot.session.close()  # Закрыть сессию бота
+        # Закрываем сессию и освобождаем ресурсы
+        await bot.close()
         logger.info("Bot session closed")
 
 

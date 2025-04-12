@@ -21,7 +21,6 @@ from src.handlers.handler_request   import (
     receive_request,
     cancel_callback_handler,
     tables_callback_handler,
-    search_priority_callback_handler
 )
 
 # Импорт обработчиков авторизации/регистрации
@@ -76,13 +75,9 @@ def register_handlers(dp: Dispatcher):
         RequestStates.choosing_list,
         F.data.startswith("sheet_")
     )
+
     dp.callback_query.register(
         cancel_callback_handler,
-        RequestStates.choosing_list,
         F.data.startswith("cancel_")
     )
-    dp.callback_query.register(
-        search_priority_callback_handler,
-        RequestStates.choosing_list,
-        F.data.startswith("priority_")
-    )
+
