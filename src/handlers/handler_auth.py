@@ -47,10 +47,18 @@ async def process_login_inn(message: types.Message, state: FSMContext):
     success = message.bot.user_manager.login_user(inn, password, message.from_user.id)
     if success:
         user = message.bot.user_manager.get_user_by_telegram(message.from_user.id)
-        discount = message.bot.user_manager.get_discount(user.user_type) * 100
-        await message.answer(
-            f"✅ Авторизация успешна!\nВаш тип: {user.user_type}\nВаша скидка: {discount}%"
-        )
+
+
+        if user.user_type == 1:
+            await message.answer(
+                f"✅ Авторизация успешна!\nВаш тип: Менеджер\n%"
+            )
+        else:
+            discount = message.bot.user_manager.get_discount(user.user_type) * 100
+            await message.answer(
+                f"✅ Авторизация успешна!\nВаш тип клиента: {user.user_type}\nВаша скидка: {discount}%"
+            )
+
         logger.info(f"Пользователь {message.from_user.id} авторизовался по ИНН {inn}")
     else:
         await message.answer("❌ Неверный ИНН или пароль. Попробуйте снова или зарегистрируйтесь через /register.")

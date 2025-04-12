@@ -1,0 +1,31 @@
+# Версия формата файла конфигурации Rasa
+version: "3.1"
+
+# Определение намерений (intents) - что пользователь хочет сделать
+intents:
+  - search_by_artikul         # Поиск по артикулу
+  - search_by_naimenovanie    # Поиск по наименованию
+
+# Определение сущностей (entities) - что нужно извлечь из сообщения пользователя
+entities:
+  - artikul               # Артикул товара
+  - naimenovanie          # Наименование товара
+
+# Определение слотов (slots) - переменные для хранения информации
+slots:
+  artikul:                   # Слот для хранения артикула
+    type: text               # Тип данных - текст
+    mappings:                # Правила заполнения слота
+      - type: from_entity    # Заполнять из найденной сущности
+        entity: artikul      # Использовать сущность 'artikul'
+
+  naimenovanie:              # Слот для хранения наименования
+    type: text               # Тип данных - текст
+    mappings:                # Правила заполнения слота
+      - type: from_entity    # Заполнять из найденной сущности
+        entity: naimenovanie # Использовать сущность 'naimenovanie'
+
+# Конфигурация сессии
+session_config:
+  session_expiration_time: 60              # Время жизни сессии в минутах
+  carry_over_slots_to_new_session: true    # Переносить значения слотов в новую сессию

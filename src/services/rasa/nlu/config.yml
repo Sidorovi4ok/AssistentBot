@@ -1,0 +1,18 @@
+version: "3.1"
+language: ru
+
+pipeline:
+- name: WhitespaceTokenizer
+- name: RegexFeaturizer            
+- name: CountVectorsFeaturizer
+- name: RegexEntityExtractor
+  use_lookup_tables: true
+  use_regexes: true
+  use_word_boundaries: true
+  entity_types:
+    - artikul
+    - naimenovanie
+- name: DIETClassifier
+  epochs: 100
+- name: EntitySynonymMapper
+assistant_id: 20250409-152429-burning-map
