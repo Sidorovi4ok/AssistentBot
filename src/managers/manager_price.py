@@ -142,7 +142,10 @@ class DataManager:
         DataManager: Экземпляр DataManager.
         """
         if not cls._instance:
-            confirm = input("Update database from Excel? (y/n): ").lower()
+            confirm = input("Update database from Excel? (y/n) default=n: ").lower().strip()
+            # Если ничего не введено, устанавливаем значение по умолчанию 'n'
+            if confirm == '':
+                confirm = 'n'
             update = confirm == 'y'
             cls._instance = cls(filename, update)
         return cls._instance

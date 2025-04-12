@@ -1,6 +1,6 @@
 
 # Импортируем необходимые модули для работы с Aiogram
-from aiogram                import Dispatcher, types
+from aiogram                import Dispatcher
 from aiogram.filters        import Command
 from aiogram                import F
 
@@ -13,6 +13,7 @@ from src.handlers.handler_about     import about_handler
 from src.handlers.handler_role      import role_handler
 from src.handlers.handler_type      import cmd_change_type
 from src.handlers.handler_client    import cmd_get_user
+
 
 # Импортируем обработчики команд, связанных с запросами
 from src.handlers.handler_request   import (
@@ -30,6 +31,14 @@ from src.handlers.handler_auth import (
     process_login_inn,
     cmd_register,
     process_register_inn
+)
+
+from src.handlers.handler_discount  import (
+    DiscountStates,
+    cmd_change_discount,
+    process_discount_type,
+    process_new_discount,
+    cancel_change_callback_handler
 )
 
 from src.filters import filter_not_authorized, filter_only_auth, filter_only_manager
@@ -57,8 +66,11 @@ def register_handlers(dp: Dispatcher):
 
 
     # Регистрируем обработчики для менеджеров
-    dp.message.register(cmd_change_type, Command(commands=["change_type"]), filter_only_manager)
-    dp.message.register(cmd_get_user,    Command(commands=["get_user"]),    filter_only_manager)
+    dp.message.register(cmd_change_discount, Command(commands=["change_discount"]), filter_only_manager)
+    dp.message.register(process_new_discount, DiscountStates.waiting_for_new_discount, filter_only_manager)
+
+    dp.message.register(cmd_change_type,     Command(commands=["change_type"]), filter_only_manager)
+    dp.message.register(cmd_get_user,        Command(commands=["get_user"]),    filter_only_manager)
 
 
     # Регистрируем обработчики информации
@@ -68,6 +80,12 @@ def register_handlers(dp: Dispatcher):
     dp.message.register(about_handler,    Command(commands=["about"]))
     dp.message.register(settings_handler, Command(commands=["settings"]))
 
+
+
+    dp.callback_query.register(
+        cancel_change_callback_handler,
+        F.data.startswith("cancel_change")
+    )
 
     # Регистрация обработчиков callback-запросов
     dp.callback_query.register(
@@ -80,4 +98,10 @@ def register_handlers(dp: Dispatcher):
         cancel_callback_handler,
         F.data.startswith("cancel_")
     )
+
+    dp.callback_query.register(
+        process_discount_type,
+        F.data.startswith("discount_")
+    )
+
 
