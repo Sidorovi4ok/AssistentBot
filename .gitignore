@@ -10,6 +10,7 @@ __pycache__/
 # Логи и данные
 /logs/
 /data/
+/tests/
 /src/services/rasa/nlu/models/
 
 # Секретные данные

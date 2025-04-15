@@ -42,9 +42,14 @@ from src.handlers.handler_discount  import (
 )
 
 from src.handlers.handler_admin import (
-    admin_handler,
-    get_log_callback_handler,
-    control_users_callback_handler
+    cmd_admin_handler,
+    admin_logs_menu_callback_handler,
+    admin_view_logs_callback_handler,
+    admin_download_logs_callback_handler,
+    admin_back_menu_callback_handler,
+    admin_db_menu_callback_handler,
+    admin_close_menu_callback_handler,
+    admin_get_users_callback_handler
 )
 
 from src.filters import filter_not_authorized, filter_only_auth, filter_only_manager, filter_only_admin
@@ -80,7 +85,8 @@ def register_handlers(dp: Dispatcher):
 
 
     # Регистрируем обработчики для админов
-    dp.message.register(admin_handler, Command(commands=["admin"]), filter_only_admin)
+    dp.message.register(cmd_admin_handler, Command(commands=["admin"]), filter_only_admin)
+
 
     # Регистрируем обработчики информации
     dp.message.register(role_handler,     Command(commands=["role"]))
@@ -113,13 +119,48 @@ def register_handlers(dp: Dispatcher):
         F.data.startswith("discount_")
     )
 
+
+
+
+
     dp.callback_query.register(
-        get_log_callback_handler,
+        admin_logs_menu_callback_handler,
+        F.data.startswith("menu_logs")
+    )
+
+    dp.callback_query.register(
+        admin_view_logs_callback_handler,
         F.data.startswith("get_logs")
     )
 
     dp.callback_query.register(
-        control_users_callback_handler,
-        F.data.startswith("get_users")
+        admin_download_logs_callback_handler,
+        F.data.startswith("download_logs")
+    )
+
+
+
+
+    dp.callback_query.register(
+        admin_db_menu_callback_handler,
+        F.data.startswith("menu_db")
+    )
+
+    dp.callback_query.register(
+        admin_get_users_callback_handler,
+        F.data.startswith("admin_get_users")
+    )
+
+
+
+
+    dp.callback_query.register(
+        admin_back_menu_callback_handler,
+        F.data.startswith("admin_back")
+    )
+
+    dp.callback_query.register(
+        admin_close_menu_callback_handler,
+        F.data.startswith("admin_close")
     )
 

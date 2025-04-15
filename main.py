@@ -2,7 +2,6 @@
 
 # Стандартные библиотеки
 import asyncio
-import requests
 
 # Сторонние библиотеки
 from aiogram import Bot, Dispatcher

@@ -1,3 +1,6 @@
 
-# Импортируем все настройки из модуля settings.
-from .settings import *
+"""
+    Импортируем все настройки из модуля config
+"""
+
+from .config import *

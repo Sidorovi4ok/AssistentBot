@@ -4,7 +4,7 @@ import threading
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, ForeignKey, Float
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.exc import IntegrityError
-from config.settings import ALLOWED_MANAGERS
+from config.config import ALLOWED_MANAGERS
 
 Base = declarative_base()
 

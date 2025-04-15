@@ -16,8 +16,6 @@ class SearchService:
         self.model = SentenceTransformer("sberbank-ai/sbert_large_nlu_ru")
         self.preproc = TextPreprocessor()
 
-        def __init__(self, base_path="data/embeddings"):
-            self.base_path = base_path
 
     def search_in_single_column(self, query, table, column, emb_manager, top_k=5):
         print(f"[🔎] Поиск в '{column}' по: '{query}'")
