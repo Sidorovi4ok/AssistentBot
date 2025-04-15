@@ -41,7 +41,13 @@ from src.handlers.handler_discount  import (
     cancel_change_callback_handler
 )
 
-from src.filters import filter_not_authorized, filter_only_auth, filter_only_manager
+from src.handlers.handler_admin import (
+    admin_handler,
+    get_log_callback_handler,
+    control_users_callback_handler
+)
+
+from src.filters import filter_not_authorized, filter_only_auth, filter_only_manager, filter_only_admin
 
 
 def register_handlers(dp: Dispatcher):
@@ -72,6 +78,9 @@ def register_handlers(dp: Dispatcher):
     dp.message.register(cmd_change_type,     Command(commands=["change_type"]), filter_only_manager)
     dp.message.register(cmd_get_user,        Command(commands=["get_user"]),    filter_only_manager)
 
+
+    # Регистрируем обработчики для админов
+    dp.message.register(admin_handler, Command(commands=["admin"]), filter_only_admin)
 
     # Регистрируем обработчики информации
     dp.message.register(role_handler,     Command(commands=["role"]))
@@ -104,4 +113,13 @@ def register_handlers(dp: Dispatcher):
         F.data.startswith("discount_")
     )
 
+    dp.callback_query.register(
+        get_log_callback_handler,
+        F.data.startswith("get_logs")
+    )
+
+    dp.callback_query.register(
+        control_users_callback_handler,
+        F.data.startswith("get_users")
+    )
 
