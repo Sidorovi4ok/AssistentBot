@@ -122,6 +122,7 @@ async def admin_db_menu_callback_handler(callback: types.CallbackQuery):
                 [InlineKeyboardButton(text="📋 Список пользователей",  callback_data="admin_get_users")],
                 [InlineKeyboardButton(text="🖋️ Изменить пользователя", callback_data="admin_edit_user")],
                 [InlineKeyboardButton(text="🗑️ Удалить пользователя",  callback_data="admin_delete_user")],
+                [InlineKeyboardButton(text="🔄 Обновить базу данных",  callback_data="admin_update_db")],
                 [InlineKeyboardButton(text="⬅️ Назад",                 callback_data="admin_back")],
             ])
             await callback.message.edit_text("🛠 Меню работы с базой данных всей системы:")
@@ -163,6 +164,29 @@ async def admin_get_users_callback_handler(callback: types.CallbackQuery):
             await callback.answer()
         except Exception as e:
             logger.exception(f"ERROR in admin_get_users_callback_handler FOR user_id={callback.from_user.id}")
+            await callback.answer(f"Ошибка: {str(e)}", show_alert=True)
+
+
+
+"""
+    admin_get_users_callback_handler
+
+    Этот обработчик обрабатывает callback admin_get_users для вывода списка в сообщении всех пользователей в базе данных
+"""
+async def admin_update_db_callback_handler(callback: types.CallbackQuery):
+    if callback.data == "admin_update_db":
+        logger.info(f"Update database command from by {callback.from_user.id}")
+        try:
+            callback.bot.data_manager.update_database()
+            await callback.message.edit_text(
+                text="✅ База данных успешно обновлена",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu_db")]
+                ])
+            )
+            await callback.answer()
+        except Exception as e:
+            logger.exception(f"ERROR in admin_update_db_callback_handler FOR user_id={callback.from_user.id}")
             await callback.answer(f"Ошибка: {str(e)}", show_alert=True)
 
 

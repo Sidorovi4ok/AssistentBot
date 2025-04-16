@@ -1,8 +1,6 @@
 
-# Импортируем необходимые модули.
-from aiogram import types
 
-# Импортируем логгер для логирования информации о процессе работы с пользователем.
+from aiogram import types
 from src.utils.logger import logger
 
 async def about_handler(message: types.Message):

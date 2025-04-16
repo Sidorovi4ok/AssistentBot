@@ -1,6 +1,16 @@
+
+"""
+    state_request.py
+    Состояние для процесса поиска по текстовому запросу
+"""
+
 from aiogram.fsm.state import State, StatesGroup
 
+
+"""
+    choosing_list        - ожидание выбора нужной таблицы
+    waiting_for_request  - ожидание ввода поиского запроса
+"""
 class RequestStates(StatesGroup):
-    """Класс состояний FSM для управления процессом запроса."""
-    choosing_list       = State()  # Выбор таблицы
-    waiting_for_request = State()  # Ожидание ввода поискового запроса
+    choosing_list       = State()
+    waiting_for_request = State()
