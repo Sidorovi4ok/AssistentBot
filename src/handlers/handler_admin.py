@@ -1,26 +1,36 @@
-
 """
-    handler_admin.py
+    ╔════════════════════════════════════════════════════════════╗
+    ║                Модуль handlers/handler_admin.py            ║
+    ╚════════════════════════════════════════════════════════════╝
 
-    Этот обработчик обрабатывает команды связанные с администрированием системы
+    Описание:
+        Модуль содержит обработчики команд и callback-запросов для администрирования
+        системы. Предоставляет функционал управления логами, базой данных и
+        перезагрузки бота через административную панель.
+
+    Функциональность:
+        - Управление системными логами (просмотр, скачивание)
+        - Управление базой данных пользователей
+        - Просмотр и редактирование пользователей
+        - Обновление базы данных
+        - Перезагрузка бота
+        - Навигация по административному интерфейсу
 """
 
-
-
-from aiogram       import types
-from src.utils     import logger
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
-from aiogram.utils.markdown import hbold, hcode
+from aiogram                   import types
+from src.utils                 import logger
+from aiogram.types             import InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
+from aiogram.utils.markdown    import hbold, hcode
 from src.managers.manager_user import User
 
 
 
-"""
-    cmd_admin_handler
 
-    Этот обработчик обрабатывает команду /admin для вывода меню администратора системы
-"""
 async def cmd_admin_handler(message: types.Message):
+    """
+        Этот обработчик обрабатывает команду /admin для вывода меню администратора системы
+    """
+    
     logger.info(f"Received ADMIN command FROM {message.from_user.id}")
     try:
         admin_main_menu_kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -39,13 +49,10 @@ async def cmd_admin_handler(message: types.Message):
         await message.answer(f"Ошибка: {e}", show_alert=True)
 
 
-
-"""
-    admin_logs_menu_callback_handler
-    
-    Этот обработчик обрабатывает callback menu_logs для вывода меню для работы с логами системы
-"""
 async def admin_logs_menu_callback_handler(callback: types.CallbackQuery):
+    """
+        Этот обработчик обрабатывает callback menu_logs для вывода меню для работы с логами системы
+    """
     if callback.data == "menu_logs":
         logger.info(f"View admin logs menu command from {callback.from_user.id}")
     try:
@@ -63,12 +70,11 @@ async def admin_logs_menu_callback_handler(callback: types.CallbackQuery):
 
 
 
-"""
-    admin_view_logs_callback_handler
 
-    Этот обработчик обрабатывает callback get_logs для вывода в сообщении последних логов из файла logs/main.log
-"""
 async def admin_view_logs_callback_handler(callback: types.CallbackQuery):
+    """
+        Этот обработчик обрабатывает callback get_logs для вывода в сообщении последних логов из файла logs/main.log
+    """
     if callback.data == "get_logs":
         logger.info(f"Get logs by {callback.from_user.id}")
         try:
@@ -88,12 +94,11 @@ async def admin_view_logs_callback_handler(callback: types.CallbackQuery):
 
 
 
-"""
-    admin_download_logs_callback_handler
 
-    Этот обработчик обрабатывает callback download_logs для отправки всего файла с логами
-"""
 async def admin_download_logs_callback_handler(callback: types.CallbackQuery):
+    """
+        Этот обработчик обрабатывает callback download_logs для отправки всего файла с логами
+    """
     if callback.data == "download_logs":
         logger.info(f"Download logs by {callback.from_user.id}")
         try:
@@ -109,12 +114,11 @@ async def admin_download_logs_callback_handler(callback: types.CallbackQuery):
 
 
 
-"""
-    admin_db_menu_callback_handler
 
-    Этот обработчик обрабатывает callback menu_db для вывода меню для работы с базой данных
-"""
 async def admin_db_menu_callback_handler(callback: types.CallbackQuery):
+    """
+        Этот обработчик обрабатывает callback menu_db для вывода меню для работы с базой данных
+    """
     if callback.data == "menu_db":
         logger.info(f"View admin database menu command from by {callback.from_user.id}")
         try:
@@ -134,23 +138,22 @@ async def admin_db_menu_callback_handler(callback: types.CallbackQuery):
 
 
 
-"""
-    admin_get_users_callback_handler
 
-    Этот обработчик обрабатывает callback admin_get_users для вывода списка в сообщении всех пользователей в базе данных
-"""
 async def admin_get_users_callback_handler(callback: types.CallbackQuery):
+    """
+        Этот обработчик обрабатывает callback admin_get_users для вывода списка в сообщении всех пользователей в базе данных
+    """
     if callback.data == "admin_get_users":
         logger.info(f"Get admin list users command from by {callback.from_user.id}")
         try:
-            session = callback.bot.user_manager.Session()
+            session = callback.bot.um.Session()
             users = session.query(User).all()
 
             user_lines = []
             for u in users:
                 user_lines.append(
                     f"{hbold('ИНН')}: {hcode(u.inn)}\n"
-                    f"{hbold('Тип')}: {callback.bot.user_manager.get_user_type_name(u.user_type)}\n"
+                    f"{hbold('Тип')}: {callback.bot.um.get_user_type_name(u.user_type)}\n"
                     f"{hbold('Telegram ID')}: {u.telegram_id or '❌'}\n"
                     f"{hbold('Авторизован')}: {'✅' if u.is_authenticated else '❌'}\n"
                     f"-------------------------"
@@ -168,16 +171,15 @@ async def admin_get_users_callback_handler(callback: types.CallbackQuery):
 
 
 
-"""
-    admin_get_users_callback_handler
 
-    Этот обработчик обрабатывает callback admin_get_users для вывода списка в сообщении всех пользователей в базе данных
-"""
 async def admin_update_db_callback_handler(callback: types.CallbackQuery):
+    """
+        Этот обработчик обрабатывает callback admin_get_users для вывода списка в сообщении всех пользователей в базе данных
+    """
     if callback.data == "admin_update_db":
         logger.info(f"Update database command from by {callback.from_user.id}")
         try:
-            callback.bot.data_manager.update_database()
+            callback.bot.dm.update_database()
             await callback.message.edit_text(
                 text="✅ База данных успешно обновлена",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -191,12 +193,11 @@ async def admin_update_db_callback_handler(callback: types.CallbackQuery):
 
 
 
-"""
-    admin_back_menu_callback_handler
 
-    Этот обработчик обрабатывает callback admin_back для возвращения в главное меню администратора
-"""
 async def admin_back_menu_callback_handler(callback: types.CallbackQuery):
+    """
+        Этот обработчик обрабатывает callback admin_back для возвращения в главное меню администратора
+    """
     if callback.data == "admin_back":
         logger.info(f"Back admin menu by {callback.from_user.id}")
         try:
@@ -215,12 +216,10 @@ async def admin_back_menu_callback_handler(callback: types.CallbackQuery):
 
 
 
-"""
-    admin_close_menu_callback_handler
-
-    Этот обработчик обрабатывает callback admin_close для закрытия меню администратора
-"""
 async def admin_close_menu_callback_handler(callback: types.CallbackQuery):
+    """
+        Этот обработчик обрабатывает callback admin_close для закрытия меню администратора
+    """
     if callback.data == "admin_close":
         logger.info(f"Close admin menu by {callback.from_user.id}")
         try:

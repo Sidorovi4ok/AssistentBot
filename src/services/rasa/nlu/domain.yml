@@ -5,11 +5,13 @@ version: "3.1"
 intents:
   - search_by_artikul         # Поиск по артикулу
   - search_by_naimenovanie    # Поиск по наименованию
+  - search_by_description     # Поиск по описанию
 
 # Определение сущностей (entities) - что нужно извлечь из сообщения пользователя
 entities:
   - artikul               # Артикул товара
   - naimenovanie          # Наименование товара
+  - description           # Описание товара
 
 # Определение слотов (slots) - переменные для хранения информации
 slots:
@@ -24,6 +26,12 @@ slots:
     mappings:                # Правила заполнения слота
       - type: from_entity    # Заполнять из найденной сущности
         entity: naimenovanie # Использовать сущность 'naimenovanie'
+
+  description:                # Слот для хранения наименования
+    type: text                # Тип данных - текст
+    mappings:                 # Правила заполнения слота
+      - type: from_entity     # Заполнять из найденной сущности
+        entity: description   # Использовать сущность 'naimenovanie'
 
 # Конфигурация сессии
 session_config:

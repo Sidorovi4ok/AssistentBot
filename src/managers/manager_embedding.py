@@ -1,12 +1,51 @@
-import os, hashlib
+"""
+    ╔════════════════════════════════════════════════════════════╗
+    ║                    Модуль manager_embedding.py             ║
+    ╚════════════════════════════════════════════════════════════╝
+
+    Описание:
+        Модуль реализует систему управления векторными представлениями (эмбеддингами)
+        текстовых данных с использованием модели SBERT и библиотеки FAISS.
+        Обеспечивает генерацию, сохранение, загрузку и поиск эмбеддингов.
+
+    Основные компоненты:
+        - EmbeddingManager: Синглтон-класс для управления эмбеддингами
+        - SentenceTransformer: Модель для генерации эмбеддингов
+        - FAISS: Библиотека для эффективного поиска ближайших соседей
+        - TextPreprocessor: Класс для предобработки текста
+
+    Функциональность:
+        - Генерация эмбеддингов для текстовых данных
+        - Сохранение и загрузка эмбеддингов
+        - Поиск похожих текстов
+        - Предобработка текста перед генерацией
+        - Нормализация векторов
+"""
+
+import hashlib
 import numpy as np
 import faiss
+from pathlib import Path
 from sentence_transformers import SentenceTransformer
-from src.utils import TextPreprocessor
+
+
+import os
+import sys
+from pathlib import Path
+
+# Добавляем корневую директорию проекта в PYTHONPATH
+root_dir = str(Path(__file__).parent.parent.parent)
+if root_dir not in sys.path:
+    sys.path.append(root_dir)
+    
+from src.utils import preprocessor
+
 
 
 class EmbeddingManager:
-    """Синглтон-класс для работы с эмбеддингами: генерация, сохранение, загрузка и поиск."""
+    """
+        Синглтон-класс для работы с эмбеддингами: генерация, сохранение, загрузка и поиск
+    """
     _instance = None
 
     def __new__(cls, *args, **kwargs):
@@ -20,7 +59,7 @@ class EmbeddingManager:
 
         self.base_path = base_path
         self.model = SentenceTransformer("sberbank-ai/sbert_large_nlu_ru")
-        self.preproc = TextPreprocessor()
+        self.preproc = preprocessor
 
         # Генерация эмбеддингов для всех таблиц и колонок
         for table in data_manager.get_all_table_names():
@@ -51,12 +90,13 @@ class EmbeddingManager:
         emb /= np.linalg.norm(emb, axis=1, keepdims=True)
         return emb
 
-    def search(self, table, column, query_emb, top_k=5):
+    def search(self, table, column, query, top_k=5):
         try:
             emb = self.load_embeddings(table, column)
             index = faiss.IndexFlatIP(emb.shape[1])
             index.add(emb)
-            distances, indices = index.search(np.array([query_emb]), top_k)
+            query_embedding = self.model.encode([query])[0]
+            distances, indices = index.search(np.array([query_embedding]), top_k)
             return distances[0], indices[0]
         except Exception as e:
             print(f"[❌] Ошибка при работе с эмбеддингами: {e}")

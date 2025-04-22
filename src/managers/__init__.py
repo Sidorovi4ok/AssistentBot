@@ -1,9 +1,17 @@
+"""
+    ╔════════════════════════════════════════════════════════════╗
+    ║                    Модуль managers/__init__.py             ║
+    ╚════════════════════════════════════════════════════════════╝
 
+    Описание:
+        Пакет managers содержит классы для управления различными аспектами приложения:
+        - DataManager:      Управление данными 
+        - UserManager:      Управление пользователями бота
+        - EmbeddingManager: Управление векторными представлениями
+"""
 
-from .manager_price      import DataManager         # Менеджер данных для работы с Excel и базой данных
-from .manager_user       import UserManager         # Менеджер данных для работы с пользоваталеями бота
-from .manager_embedding  import EmbeddingManager    # Менеджер
+from .manager_price      import DataManager         
+from .manager_user       import UserManager         
+from .manager_embedding  import EmbeddingManager    
 
-
-# Определяем список объектов, которые будут доступны при импорте пакета.
 __all__ = ["DataManager", "UserManager", "EmbeddingManager"]

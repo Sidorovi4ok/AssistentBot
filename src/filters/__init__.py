@@ -1,21 +1,25 @@
+"""
+    ╔════════════════════════════════════════════╗
+    ║              filters/__init__.py           ║
+    ╚════════════════════════════════════════════╝
+
+    Описание:
+        Пакет фильтров для Telegram бота.
+        Содержит фильтры для проверки прав доступа и авторизации пользователей.
+
+    Компоненты:
+        • filter_not_authorized - фильтр для неавторизованных пользователей
+        • filter_only_auth - фильтр для авторизованных пользователей
+        • filter_only_manager - фильтр для пользователей с правами менеджера
+        • filter_only_admin - фильтр для пользователей с правами администратора
 
 """
-    Импортирует все фильтры для дальнейшего использования из filters
-"""
 
-from .filter_article      import filter_article
-from .filter_product_name import filter_product_name
 from .filter_not_auth     import filter_not_authorized
 from .filter_only_auth    import filter_only_auth
 from .filter_only_manager import filter_only_manager
 from .filter_only_admin   import filter_only_admin
 
-
-"""
-    Определяем список объектов, которые будут доступны при импорте пакета
-    Это позволяет скрыть внутренние детали реализации и 
-    предоставляет только нужные элементы для использования
-"""
 __all__ = [
     "filter_article",
     "filter_product_name",

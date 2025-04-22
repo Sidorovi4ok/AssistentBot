@@ -1,10 +1,36 @@
+"""
+    ╔════════════════════════════════════════════════════════════╗
+    ║                    Модуль manager_user.py                   ║
+    ╚════════════════════════════════════════════════════════════╝
+
+    Описание:
+        Модуль реализует систему управления пользователями с использованием SQLAlchemy.
+        Включает функционал регистрации, аутентификации, управления скидками
+        и типами пользователей.
+
+    Основные компоненты:
+        - User: Модель пользователя с полями inn, password, user_type, telegram_id
+        - Discount: Модель скидок для разных типов пользователей
+        - UserManager: Синглтон-класс для управления пользователями
+
+    Функциональность:
+        - Регистрация и аутентификация пользователей
+        - Управление типами пользователей (менеджер, клиент)
+        - Система скидок для разных типов пользователей
+        - Безопасное хранение паролей (хеширование)
+        - Привязка к Telegram ID
+"""
+
 import os
 import hashlib
 import threading
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, ForeignKey, Float
-from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy.exc import IntegrityError
-from config.config import ALLOWED_MANAGERS
+
+from sqlalchemy      import create_engine, Column, Integer, String, Boolean, ForeignKey, Float
+from sqlalchemy.orm  import sessionmaker, declarative_base
+from sqlalchemy.exc  import IntegrityError
+from config          import config
+
+
 
 Base = declarative_base()
 
@@ -73,7 +99,7 @@ class UserManager:
     def register_user(self, inn: str, password: str, telegram_id: int, user_type: int = 2) -> bool:
         session = self.Session()
         try:
-            if telegram_id in ALLOWED_MANAGERS:
+            if telegram_id in config.users.managers:
                 user_type = 1
 
             new_user = User(

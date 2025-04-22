@@ -14,5 +14,6 @@ pipeline:
     - naimenovanie
 - name: DIETClassifier
   epochs: 100
+  constrain_similarities: True
 - name: EntitySynonymMapper
 assistant_id: 20250409-152429-burning-map

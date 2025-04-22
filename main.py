@@ -1,8 +1,26 @@
 """
     ╔════════════════════════════════════════════╗
-    ║                ИМПОРТЫ                     ║
+    ║                main.py                     ║
     ╚════════════════════════════════════════════╝
+    
+    Описание:
+        Основной модуль приложения, отвечающий за:
+        • Инициализацию всех необходимых компонентов системы
+        • Настройку и конфигурацию телеграм-бота
+        • Управление жизненным циклом бота
+
+    Компоненты:
+        • DataManager      - управление данными и их хранением
+        • UserManager      - управление пользователями и их данными
+        • EmbeddingManager - работа с векторными представлениями
+        • RasaClient       - взаимодействие с rasa-моделью
+        
+    Зависимости:
+        • aiogram    - библиотека для создания телеграм-ботов
+        • asyncio    - библиотека для асинхронной работы
 """
+
+
 
 import asyncio
 
@@ -13,49 +31,44 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from src.handlers               import register_handlers
 from src.managers               import DataManager, UserManager, EmbeddingManager
-from src.services.rasa.client   import RasaClient
+from src.services               import RasaClient
 from src.utils                  import logger
 
-from config import BOT_TOKEN, DATA_FILE
+from config                     import config
 
-"""
-    ╔════════════════════════════════════════════╗
-    ║           Функция запуска бота             ║
-    ╚════════════════════════════════════════════╝
-"""
+
 
 async def main():
-    # Инициализация менеджера для работы с данными
-    data_manager = DataManager.initialize(DATA_FILE)
-
-    # Инициализация менеджера для работы с эмбеддингами
-    embedding_manager = EmbeddingManager(data_manager)
-
-    # Инициализация менеджера для работы с пользователями
-    user_manager = UserManager()
-
-    # Инициализация клиена для работы с нашей моделью rasa
-    raca_manager = RasaClient()
-    if not raca_manager.is_available:
-        print("[❌] Rasa недоступен. Убедитесь, что API работает:", rc.api_url)
+    """
+        Основная функция инициализации и запуска бота
+    """
+    
+    dm = DataManager.initialize(config.data.data_file)
+    em = EmbeddingManager(dm)
+    um = UserManager()
+    
+    
+    if not await RasaClient.check_availability():
         return
 
+    # Создание и настройка экземпляра бота
     bot = Bot(
-        token=BOT_TOKEN,
+        token=config.bot.token,
         default=DefaultBotProperties(
             parse_mode=ParseMode.HTML,
         )
     )
 
-    bot.data_manager      = data_manager
-    bot.embedding_manager = embedding_manager
-    bot.user_manager      = user_manager
-    bot.rasa_manager      = raca_manager
+    # Привязка менеджеров к экземпляру бота для удобного доступа
+    bot.dm = dm
+    bot.um = um
+    bot.em = em
 
-
+    # Создание диспетчера и регистрация обработчиков
     dp = Dispatcher(storage=MemoryStorage())
     register_handlers(dp)
 
+    # Запуск бота и обработка исключений
     try:
         logger.info("Starting polling")
         await dp.start_polling(bot)

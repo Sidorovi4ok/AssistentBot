@@ -1,7 +1,32 @@
+"""
+    ╔════════════════════════════════════════════════════════════╗
+    ║                Модуль handlers/handler_manager.py          ║
+    ╚════════════════════════════════════════════════════════════╝
+
+    Описание:
+        Модуль содержит обработчики для панели управления менеджера, предоставляя
+        функционал управления пользователями и товарами через интерактивное меню.
+        Включает возможности просмотра, редактирования и обновления данных.
+
+    Функциональность:
+        Управление пользователями:
+            - Просмотр списка всех пользователей
+            - Получение информации о конкретном пользователе
+            - Изменение типа пользователя
+            - Управление скидками для разных категорий
+            - Редактирование данных пользователей
+
+        Управление товарами:
+            - Просмотр информации о товарах
+            - Обновление прайс-листа через Excel
+            - Скачивание текущего прайс-листа
+            - Редактирование данных товаров
+"""
+
 from aiogram                    import types
 from src.utils                  import logger
 from aiogram.types              import InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
-from aiogram.exceptions import TelegramBadRequest
+from aiogram.exceptions         import TelegramBadRequest
 from aiogram.fsm.context        import FSMContext
 from aiogram.utils.markdown     import hbold, hcode
 from src.managers.manager_user  import User
@@ -65,14 +90,14 @@ async def manager_get_users_callback_handler(callback: types.CallbackQuery):
     if callback.data == "manager_get_users":
         logger.info(f"Get from manager list users command from by {callback.from_user.id}")
         try:
-            session = callback.bot.user_manager.Session()
+            session = callback.bot.um.Session()
             users = session.query(User).all()
 
             user_lines = []
             for u in users:
                 user_lines.append(
                     f"{hbold('ИНН')}: {hcode(u.inn)}\n"
-                    f"{hbold('Тип')}: {callback.bot.user_manager.get_user_type_name(u.user_type)}\n"
+                    f"{hbold('Тип')}: {callback.bot.um.get_user_type_name(u.user_type)}\n"
                     f"{hbold('Telegram ID')}: {u.telegram_id or '❌'}\n"
                     f"{hbold('Авторизован')}: {'✅' if u.is_authenticated else '❌'}\n"
                     f"-------------------------"
@@ -108,14 +133,14 @@ async def manager_get_user_callback_handler(callback: types.CallbackQuery, state
 
 async def handle_inn_user(message: types.Message, state: FSMContext):
     try:
-        user = message.bot.user_manager.get_user_by_inn(message.text)
+        user = message.bot.um.get_user_by_inn(message.text)
         if not user:
             await message.answer("❌ Пользователь с таким ИНН не найден.")
             return
         info = (
             f"{hbold('ИНН:')} {hcode(user.inn)}\n"
             f"{hbold('Telegram ID:')} {user.telegram_id or '—'}\n"
-            f"{hbold('Тип пользователя:')} {user.user_type} ({message.bot.user_manager.get_user_type_name(user.user_type)})\n"
+            f"{hbold('Тип пользователя:')} {user.user_type} ({message.bot.um.get_user_type_name(user.user_type)})\n"
             f"{hbold('Авторизован:')} {'✅' if user.is_authenticated else '❌'}"
         )
         await message.answer(info)
@@ -186,7 +211,7 @@ async def manager_change_type_handler(message: types.Message):
     except ValueError:
         await message.answer("❌ Тип должен быть числом 2, 3 или 4.")
         return
-    success = message.bot.user_manager.change_user_type(inn, new_type)
+    success = message.bot.um.change_user_type(inn, new_type)
     if success:
         await message.answer(f"✅ Тип пользователя с ИНН {hbold(inn)} успешно изменён на {new_type}.")
     else:
@@ -251,8 +276,7 @@ async def manager_wait_new_discount_callback_handler(message: types.Message, sta
         if user_type is None:
             await message.answer("Вы не выбрали тип пользователя!")
             return
-        user_manager = message.bot.user_manager
-        success = user_manager.set_discount(user_type, new_discount)
+        success = message.bot.um.set_discount(user_type, new_discount)
         if success:
             user_data = await state.get_data()
             message_id = user_data.get("discount_message_id")
@@ -266,7 +290,7 @@ async def manager_wait_new_discount_callback_handler(message: types.Message, sta
                     pass
 
             await message.answer(
-                f"Скидка для типа {user_manager.get_user_type_name(user_type)} успешно обновлена на {new_discount * 100}%")
+                f"Скидка для типа {message.bot.um.get_user_type_name(user_type)} успешно обновлена на {new_discount * 100}%")
             await state.clear()
         else:
             await message.answer("Произошла ошибка при обновлении скидки.")
@@ -314,6 +338,7 @@ async def manager_products_menu_callback_handler(callback: types.CallbackQuery):
 async def manager_update_excel_callback_handler(callback: types.CallbackQuery, state: FSMContext):
     if callback.data == "manager_update_excel":
         logger.info(f"Update excel-price by {callback.from_user.id}")
+        
         try:
             await callback.message.answer("📎 Пожалуйста, отправьте новый Excel-файл (.xlsx) для обновления прайса.")
             await state.set_state(ManagerPanelStates.waiting_for_file)
@@ -322,6 +347,7 @@ async def manager_update_excel_callback_handler(callback: types.CallbackQuery, s
             await callback.answer(f"Ошибка: {str(e)}", show_alert=True)
 
 async def handle_excel_file(message: types.Message, state: FSMContext):
+    logger.info(f"Get excel-price by {message.from_user.id}")
     try:
         document = message.document
         if not document.file_name.endswith(".xlsx"):

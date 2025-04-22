@@ -4,9 +4,10 @@ from fuzzywuzzy import fuzz
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Border, Side
 from src.managers.manager_price import DataManager
+from tqdm import tqdm
 
 # --- НАСТРОЙКИ ---
-INPUT_EXCEL = 'test_1.xlsx'
+INPUT_EXCEL = 'tests/data/test_2.xlsx'
 OUTPUT_EXCEL = 'sales_report.xlsx'
 SIMILARITY_THRESHOLD = 80  # порог схожести (0-100)
 FUZZY_METHOD = fuzz.WRatio  # алгоритм fuzzywuzzy
@@ -85,7 +86,12 @@ def process_input_sheets(input_file):
 combined_df = process_input_sheets(INPUT_EXCEL)
 report_data = []
 
-for _, row in combined_df.iterrows():
+for _, row in tqdm(combined_df.iterrows(), total=len(combined_df), desc="🔍 Обработка товаров"):
+    prod = row['Наименование товара']
+
+    # Пропуск пустых значений
+    if pd.isna(prod) or str(prod).strip() == '':
+        continue
     prod = row['Наименование товара']
     quantity = row['Кол-во']
     exact, partial = find_product_in_db(prod)

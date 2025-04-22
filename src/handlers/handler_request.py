@@ -1,169 +1,78 @@
 """
-handler_request.py
-
-Этот модуль содержит обработчики команд, связанных с запросами товаров.
-Бот позволяет пользователям выбирать таблицу, приоритет поиска и находить товары по заданному запросу.
+    ╔════════════════════════════════════════════╗
+    ║           handlers/request.py              ║
+    ╚════════════════════════════════════════════╝
+    
+    Описание:
+        Этот модуль содержит обработчики команд, связанных с запросами товаров
 """
 
-# Импортируем необходимые модули
-import requests
-import re
-# Импортируем необходимые классы из библиотеки aiogram для обработки сообщений.
-from aiogram import types
-from aiogram.fsm.context import FSMContext
-from aiogram.exceptions import TelegramBadRequest
-from aiogram.utils.formatting import Text
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# Импортируем утилиты и менеджеры
-from src.utils import logger, SearchService
-from src.states import RequestStates
+import pandas as pd
+
+from aiogram                   import types
+from aiogram.fsm.context       import FSMContext
+from aiogram.exceptions        import TelegramBadRequest
+from aiogram.types             import InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
+
+from src.utils                 import logger
+from src.states                import RequestStates
+from src.services              import TextGenerator
+from src.services              import RasaClient
+
 
 
 async def request_handler(message: types.Message, state: FSMContext):
     """
-    Обработчик команды /request.
-    Отображает пользователю список таблиц для выбора.
+        Обработчик команды /request.
+        Отображает пользователю список таблиц для выбора.
     """
     logger.info(f"Received request command from {message.from_user.id}")
-
-    data_manager = message.bot.data_manager
-    lists = data_manager.get_sheet_names()
-
-    # Создаем inline-клавиатуру с таблицами
-    list_keyboard = InlineKeyboardMarkup(
-        inline_keyboard=
-        [
-            [InlineKeyboardButton(text=sheet_name, callback_data=f"sheet_{sheet_name}")]
-            for sheet_name in lists
-        ] + [
-            [InlineKeyboardButton(text="Отменить", callback_data="cancel_")]
-        ]
-    )
-
-    # Отправляем сообщение с выбором таблицы и сохраняем его ID
+    
+    request_main_manu = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🖊️ Текстовый запрос", callback_data="request_text_menu")],
+        [InlineKeyboardButton(text="📃 Файловый запрос",  callback_data="request_file_menu")],
+        [InlineKeyboardButton(text="❌ Закрыть меню",     callback_data="request_close_menu")],
+    ])
+    
     sent_message = await message.answer(
-        "📚 Пожалуйста, выберите таблицу для поиска:",
-        reply_markup=list_keyboard
+        "📚 Пожалуйста, выберите формат поиска:",
+        reply_markup=request_main_manu
     )
-
-    await state.set_state(RequestStates.choosing_list)
     await state.update_data(request_message_id=sent_message.message_id)
 
 
-async def receive_request(message: types.Message, state: FSMContext):
+async def request_text_menu(callback: types.CallbackQuery, state: FSMContext):
     """
-    Обработчик ввода поискового запроса пользователем.
-    Выполняет поиск в базе данных и отправляет ответ пользователю.
+        Этот обработчик обрабатывает callback для вывода меню текстового запроса
     """
-    logger.info(f"Request received from {message.from_user.id}: {message.text}")
-
-    user_data = await state.get_data()
-    request_message_id = user_data.get("request_message_id")
-    choosing_list = user_data.get("choosing_list")
-
-    data_manager = message.bot.data_manager
-    data_frame = data_manager.get_table_data(choosing_list)
-
-    # Убираем клавиатуру с выбора таблицы
-    if request_message_id:
+    if callback.data == "request_text_menu":
+        logger.info(f"Get request menu command from {callback.from_user.id}")
         try:
-            await message.bot.edit_message_reply_markup(
-                chat_id=message.chat.id,
-                message_id=request_message_id,
-                reply_markup=None
+            lists = callback.bot.dm.get_sheet_names()
+            request_table_text = InlineKeyboardMarkup(
+                inline_keyboard=
+                [
+                    [InlineKeyboardButton(text=sheet_name, callback_data=f"sheet_{sheet_name}")]
+                    for sheet_name in lists
+                ] + [
+                    [InlineKeyboardButton(text="⬅️ Назад", callback_data="request_back_main_menu")]
+                ]
             )
-        except TelegramBadRequest as e:
-            if "message is not modified" not in str(e):
-                logger.error(f"Error editing message: {e}")
 
-    # Отправляем подтверждение
-    await message.answer("✅ Запрос принят в обработку. Ожидайте ответа.")
-
-    # Очищаем состояние
-    await state.clear()
-
-    rasa_manager = message.bot.rasa_manager
-    emb_manager  = message.bot.embedding_manager
-    search_service = SearchService(data_manager, rasa_manager)
-    result = search_service.search_smart(message.text, choosing_list, emb_manager)
-
-    if result.empty:
-        await message.answer("🔍 По вашему запросу ничего не найдено.", parse_mode="Markdown")
-        return
-
-    # Запрос к API для генерации ответа
-    url = "https://api.intelligence.io.solutions/api/v1/chat/completions"
-
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer io-v2-eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJvd25lciI6IjcxZjA0YjZhLTIxMjQtNDI4MS1iMTkxLTUyMzAwN2JiYjk4NSIsImV4cCI6NDg5NjQ5MzM3NH0.QXE6r9Gbdkpv_fzI6lbgIG8uU8EkKpH3vMw-KK7enDimGsQWfrl6xdIT5MD0Lg_xUwGWyAdm5haLix_rf4mlcw",
-    }
-
-    data = {
-        "model": "neuralmagic/Llama-3.1-Nemotron-70B-Instruct-HF-FP8-dynamic",
-        "messages": [
-            {
-                "role": "system",
-                "content":
-                    '''
-                        Ты бот-ассистент для работы с товарами.
-                        Проанализируй предоставленные данные о товаре и оформи ответ точно по шаблону ниже. 
-                        Избегай сплошного текста. Сохраняй лаконичность и отвечай только согласно формату.
-    
-                        Сначала тебе необходимо дать ответ на вопрос пользователя(если он есть в запросе), затем вывести информацию о интересующем его товаре
-                        [Ответ:]
-    
-                        Шаблон ответа пользователю:  
-                            ### 1. Товар:
-                                - Артикул: [значение]
-                                - Наименование: [значение]
-                                - Описание: [краткое описание, если есть]
-                            
-                            ### 2. Цены:
-                                - Базовая цена: [значение]
-                                - Цена с НДС: [значение]
-                                - РРЦ: [значение]
-                                - Акции/Скидки: Не указаны
-                            
-                            ### 3. Характеристики:
-                                - Ед. изм.: [шт / компл]
-                                - Кол-во листов: [значение]
-                                - Формат: [значение]
-                                - Класс: [значение]
-                                - Материал: [значение]
-                                - Карты, стенды, таблицы: [карта / стенд / таблица]
-                            
-                            ### 4. Наличие:
-                                - Статус: [Требует уточнения]
-                            
-                            ### 5. Рекомендации:
-                                Похожие товары:
-                                    - (Артикул 1: [значение 1]), [Название 1], цена 1: [значение 1], преимущество 1: [описание 1]
-                                    - (Артикул 2: [значение 2]), [Название 2], цена 2: [значение 2], преимущество 2: [описание 2]
-                    '''
-                    +
-                    f"Используй только предоставленные данные: {result}."
-            },
-            {
-                "role": "user",
-                "content": f"Запрос: {message.text}."
-            }
-        ],
-    }
-
-    response = requests.post(url, headers=headers, json=data)
-    data = response.json()
-
-    text = data['choices'][0]['message']['content']
-    await message.answer(text, "Markdown")
-
-
+            await callback.message.edit_text("📚 Пожалуйста, выберите таблицу для поиска:")
+            await callback.message.edit_reply_markup(reply_markup=request_table_text)
+            await state.set_state(RequestStates.choosing_list)
+            await callback.answer()
+            
+        except Exception as e:
+            logger.exception(f"ERROR in request_text_menu FOR user_id={callback.from_user.id}")
+            await callback.answer(f"Ошибка: {e}", show_alert=True)
+            
 
 async def tables_callback_handler(callback_query: types.CallbackQuery, state: FSMContext):
     """
-    Обработчик выбора таблицы через inline-кнопку.
-    Запрашивает у пользователя критерий поиска (Артикул / Наименование).
+        Обработчик выбора таблицы через inline-кнопку.
     """
     if callback_query.data.startswith("sheet_"):
         chosen_list = callback_query.data.split("_", 1)[1]
@@ -191,8 +100,8 @@ async def tables_callback_handler(callback_query: types.CallbackQuery, state: FS
 
 async def cancel_callback_handler(callback_query: types.CallbackQuery, state: FSMContext):
     """
-    Обработчик отмены через inline-кнопку.
-    Очищает состояние и отменяет запрос.
+        Обработчик отмены через inline-кнопку.
+        Очищает состояние и отменяет запрос.
     """
     if callback_query.data == "cancel_":
         logger.info(f"Cancel by {callback_query.from_user.id}")
@@ -213,3 +122,169 @@ async def cancel_callback_handler(callback_query: types.CallbackQuery, state: FS
         await state.clear()
         await callback_query.message.edit_text("🚫 Запрос отменен. Возврат в главное меню")
         await callback_query.answer()
+    
+    
+async def receive_request(message: types.Message, state: FSMContext):
+    """
+    Обработчик ввода поискового запроса пользователем.
+    Выполняет поиск в базе данных и отправляет ответ пользователю.
+    """
+    logger.info(f"Request received from {message.from_user.id}: {message.text}")
+
+    user_data = await state.get_data()
+    request_message_id = user_data.get("request_message_id")
+    choosing_list = user_data.get("choosing_list")
+
+    # Убираем клавиатуру с выбора таблицы
+    if request_message_id:
+        try:
+            await message.bot.edit_message_reply_markup(
+                chat_id=message.chat.id,
+                message_id=request_message_id,
+                reply_markup=None
+            )
+        except TelegramBadRequest as e:
+            if "message is not modified" not in str(e):
+                logger.error(f"Error editing message: {e}")
+
+    # Отправляем подтверждение
+    await message.answer("✅ Запрос принят в обработку. Ожидайте ответа.")
+
+    # Очищаем состояние
+    await state.clear()
+    
+    # Используем контекстный менеджер для RasaClient
+    async with RasaClient() as rc:
+        search_data = await rc.process_query(message.text)
+        search_entity, search_intent, target_column = search_data
+
+        if search_intent == 'search_by_artikul':
+            search_entity = search_entity['artikul']
+        elif search_intent == 'search_by_naimenovanie':
+            search_entity = search_entity['naimenovanie']
+        elif search_intent == 'search_by_description':
+            search_entity = search_entity['description']
+            
+        distances, indices = message.bot.em.search(choosing_list, target_column, search_entity)
+
+        if distances is not None and indices is not None:
+            found_products = []
+            
+            for i, (distance, idx) in enumerate(zip(distances, indices), 1):
+                product_data = message.bot.dm.get_table_data(choosing_list).iloc[idx]
+                product_dict = product_data.to_dict()
+            
+                found_products.append(product_dict)
+                
+                print(f"\n{i}. Товар: {product_dict['Наименование']}")
+                print(f"   Артикул:   {product_dict['Артикул']}")
+                print(f"   Описание:  {product_dict['Описание']}")
+                print(f"   Схожесть:  {distance:.2%}")
+            
+            result_df = pd.DataFrame(found_products)
+            
+            # Используем контекстный менеджер для TextGenerator
+            async with TextGenerator() as text_generator:
+                generated_text = await text_generator.generate_text(message.text, str(result_df))
+                await message.answer(generated_text)
+        else:
+            await message.answer("🔍 По вашему запросу ничего не найдено.")
+            return
+
+
+async def request_file_menu(callback: types.CallbackQuery, state: FSMContext):
+    """
+        Этот обработчик обрабатывает callback для файлового запроса
+    """
+    if callback.data == "request_file_menu":
+        logger.info(f"Get request file command from {callback.from_user.id}")
+        try:
+            request_file_kb = InlineKeyboardMarkup(
+                inline_keyboard= [
+                    [InlineKeyboardButton(text="📩 Сформировать КП по вашему файлу", callback_data="request_from_file")],
+                    [InlineKeyboardButton(text="📊 Получить формат запроса",         callback_data="request_get_example")],
+                    [InlineKeyboardButton(text="⬅️ Назад",                           callback_data="request_back_main_menu")]
+                ]
+            )
+
+            await callback.message.edit_text("📚 Пожалуйста, отправьте свою таблицу для формирования файла КП, в соответсвии с форматом:")
+            await callback.message.edit_reply_markup(reply_markup=request_file_kb)
+            await callback.answer()
+            
+        except Exception as e:
+            logger.exception(f"ERROR in request_file_menu FOR user_id={callback.from_user.id}")
+            await callback.answer(f"Ошибка: {e}", show_alert=True)
+
+
+async def request_get_example(callback: types.CallbackQuery, state: FSMContext):
+    """
+        Этот обработчик обрабатывает callback для вывода примера для запроса
+    """
+    if callback.data == "request_get_example":
+        logger.info(f"Get request get example menu from {callback.from_user.id}")
+        try:
+            example_file = FSInputFile("data/excel/example-format.xlsx")
+            await callback.message.answer_document(
+                document=example_file,
+                caption="📊 Вот файл-пример для запроса в систему"
+            )
+            await callback.answer()
+        except Exception as e:
+            logger.exception(f"ERROR in admin_download_logs_callback_handler FOR user_id={callback.from_user.id}")
+            await callback.answer(f"Ошибка: {str(e)}", show_alert=True)
+
+
+async def request_back_main_menu(callback: types.CallbackQuery, state: FSMContext):
+    """
+        Этот обработчик обрабатывает callback для возврата в главное меню
+    """
+    if callback.data == "request_back_main_menu":
+        logger.info(f"Get request back main menu from {callback.from_user.id}")
+        try:
+            request_main_manu = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🖊️ Текстовый запрос", callback_data="request_text_menu")],
+                [InlineKeyboardButton(text="📃 Файловый запрос",  callback_data="request_file_menu")],
+                [InlineKeyboardButton(text="❌ Закрыть меню",     callback_data="request_close_menu")],
+            ])
+
+            await callback.message.edit_text("📚 Пожалуйста, выберите формат поиска:")
+            await callback.message.edit_reply_markup(reply_markup=request_main_manu)
+            await callback.answer()
+            
+        except Exception as e:
+            logger.exception(f"ERROR in request_file_menu FOR user_id={callback.from_user.id}")
+            await callback.answer(f"Ошибка: {e}", show_alert=True)
+
+
+async def request_close_menu(callback: types.CallbackQuery, state: FSMContext):
+    """
+        Этот обработчик обрабатывает callback для закрытия главного меню
+    """
+    if callback.data == "request_close_menu":
+        logger.info(f"Get request close main menu from {callback.from_user.id}")
+        try:
+            await callback.message.delete()
+            await callback.answer()
+        except Exception as e:
+            logger.exception(f"ERROR in request_close_menu FOR user_id={callback.from_user.id}")
+            await callback.answer(f"Ошибка: {str(e)}", show_alert=True)
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
