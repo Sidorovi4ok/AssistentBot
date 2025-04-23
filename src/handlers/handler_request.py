@@ -7,8 +7,12 @@
         Этот модуль содержит обработчики команд, связанных с запросами товаров
 """
 
-
+import os
 import pandas as pd
+from pathlib import Path
+import asyncio
+from datetime import datetime
+import json
 
 from aiogram                   import types
 from aiogram.fsm.context       import FSMContext
@@ -18,8 +22,9 @@ from aiogram.types             import InlineKeyboardMarkup, InlineKeyboardButton
 from src.utils                 import logger
 from src.states                import RequestStates
 from src.services              import TextGenerator
-from src.services              import RasaClient
-
+from src.services              import RasaClient   
+from src.utils                 import ExcelProcessor
+from src.filters               import filter_only_auth
 
 
 async def request_handler(message: types.Message, state: FSMContext):
@@ -27,6 +32,8 @@ async def request_handler(message: types.Message, state: FSMContext):
         Обработчик команды /request.
         Отображает пользователю список таблиц для выбора.
     """
+    if not await filter_only_auth(message):
+        return
     logger.info(f"Received request command from {message.from_user.id}")
     
     request_main_manu = InlineKeyboardMarkup(inline_keyboard=[
@@ -173,19 +180,37 @@ async def receive_request(message: types.Message, state: FSMContext):
             for i, (distance, idx) in enumerate(zip(distances, indices), 1):
                 product_data = message.bot.dm.get_table_data(choosing_list).iloc[idx]
                 product_dict = product_data.to_dict()
-            
                 found_products.append(product_dict)
-                
-                print(f"\n{i}. Товар: {product_dict['Наименование']}")
-                print(f"   Артикул:   {product_dict['Артикул']}")
-                print(f"   Описание:  {product_dict['Описание']}")
-                print(f"   Схожесть:  {distance:.2%}")
-            
-            result_df = pd.DataFrame(found_products)
+                print(product_dict)
+
+            with pd.option_context('display.max_rows', None):
+                result_df = pd.DataFrame(found_products)
             
             # Используем контекстный менеджер для TextGenerator
             async with TextGenerator() as text_generator:
-                generated_text = await text_generator.generate_text(message.text, str(result_df))
+                # Преобразуем DataFrame в более читаемый формат для LLM
+                formatted_data = []
+                for _, row in result_df.iterrows():
+                    product_info = {
+                        "Артикул": row.get("Артикул", ""),
+                        "Наименование": row.get("Наименование", ""),
+                        "Описание": row.get("Описание", ""),
+                        "Цена": row.get("Цена", ""),
+                        "Цена с НДС": row.get("Цена с НДС", ""),
+                        "РРЦ": row.get("РРЦ", ""),
+                        "Ед. изм.": row.get("Ед. изм.", ""),
+                        "Кол-во листов": row.get("Кол-во листов", ""),
+                        "Формат": row.get("Формат", ""),
+                        "Класс": row.get("Класс", ""),
+                        "Материал": row.get("Материал", ""),
+                        "Карты, стенды, таблицы": row.get("Карты, стенды, таблицы", "")
+                    }
+                    formatted_data.append(product_info)
+                
+                # Преобразуем в JSON для лучшей читаемости
+                formatted_json = json.dumps(formatted_data, ensure_ascii=False, indent=2)
+                
+                generated_text = await text_generator.generate_text(message.text, formatted_json)
                 await message.answer(generated_text)
         else:
             await message.answer("🔍 По вашему запросу ничего не найдено.")
@@ -232,6 +257,140 @@ async def request_get_example(callback: types.CallbackQuery, state: FSMContext):
         except Exception as e:
             logger.exception(f"ERROR in admin_download_logs_callback_handler FOR user_id={callback.from_user.id}")
             await callback.answer(f"Ошибка: {str(e)}", show_alert=True)
+
+
+
+
+async def request_from_file(callback: types.CallbackQuery, state: FSMContext):
+    if callback.data == "request_from_file":
+        logger.info(f"Request excel-prfrom file by {callback.from_user.id}")
+        try:
+            await callback.message.answer("📎 Ожидаем Ваш Excel-файл (.xlsx) для расчета файла КП в соответсвии с нашими товарами")
+            await state.set_state(RequestStates.waiting_for_file)
+        except Exception as e:
+            logger.exception(f"ERROR in request_from_file FOR user_id={callback.from_user.id}")
+            await callback.answer(f"Ошибка: {str(e)}", show_alert=True)
+            
+            
+async def handle_request_excel_file(message: types.Message, state: FSMContext):
+    logger.info(f"Get request excel by {message.from_user.id}")
+    input_file = None
+    output_file = None
+    progress_message = None
+    last_progress_text = None
+    
+    try:
+        document = message.document
+        if not document.file_name.endswith(".xlsx"):
+            await message.reply("⚠️ Пожалуйста, отправьте файл в формате .xlsx")
+            return
+
+        # Создаем временную директорию для файлов
+        temp_dir = Path("data/excel/requests_files")
+        temp_dir.mkdir(exist_ok=True)
+
+        # Генерируем уникальные имена файлов
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        input_file = temp_dir / f"input_{timestamp}_{document.file_name}"
+        output_file = temp_dir / f"result_{timestamp}_{Path(document.file_name).stem}_РАСЧЕТ_КП.xlsx"
+        
+        # Отправляем сообщение о начале загрузки
+        progress_message = await message.answer("⏳ Начинаю загрузку файла...")
+        
+        # Скачиваем файл
+        await message.bot.download(document, destination=input_file)
+        await progress_message.edit_text("✅ Файл загружен. Начинаю обработку...")
+
+        # Функция для обновления прогресса
+        async def update_progress(progress: float):
+            nonlocal last_progress_text
+            progress_text = f"⏳ Обработка файла: {int(progress * 100)}%"
+            if progress < 0.3:
+                progress_text += "\n🔍 Проверка формата файла..."
+            elif progress < 0.8:
+                progress_text += "\n📊 Поиск товаров в базе..."
+            elif progress < 0.9:
+                progress_text += "\n💾 Сохранение результатов..."
+            else:
+                progress_text += "\n✨ Применение форматирования..."
+            
+            # Обновляем сообщение только если текст изменился
+            if progress_text != last_progress_text:
+                try:
+                    await progress_message.edit_text(progress_text)
+                    last_progress_text = progress_text
+                except Exception as e:
+                    logger.error(f"Error updating progress: {e}")
+
+        # Обрабатываем файл
+        processor = ExcelProcessor()
+        processor.set_progress_callback(update_progress)
+        
+        try:
+            success, error_message = await processor.process_file_async(str(input_file), str(output_file))
+        except Exception as e:
+            logger.exception("Error during file processing")
+            success, error_message = False, str(e)
+
+        if success:
+            # Отправляем обработанный файл
+            await progress_message.edit_text("✅ Файл успешно обработан. Отправляю результат...")
+            
+            # Отправляем файл и ждем завершения отправки
+            sent_document = await message.answer_document(
+                document=FSInputFile(output_file),
+                caption="✅ Файл успешно обработан. Вот ваш расчет КП:"
+            )
+            
+            # Ждем, пока файл будет полностью отправлен
+            await asyncio.sleep(2)
+        else:
+            await progress_message.edit_text(f"❌ Ошибка при обработке файла: {error_message}")
+
+        await state.clear()
+    except Exception as e:     
+        logger.exception(f"ERROR in handle_excel_file FOR user_id={message.from_user.id}")
+        if progress_message:
+            logger.exception(f"ERROR in handle_excel_file FOR user_id={message.from_user.id}")
+        else:
+            logger.exception(f"ERROR in handle_excel_file FOR user_id={message.from_user.id}")
+    finally:
+        # Удаляем временные файлы после небольшой задержки
+        if input_file or output_file:
+            # Даем время на освобождение файлов
+            for attempt in range(5):  # Увеличиваем количество попыток
+                try:
+                    if input_file and input_file.exists():
+                        try:
+                            # Пробуем закрыть файл перед удалением
+                            import gc
+                            gc.collect()
+                            await asyncio.sleep(1)
+                            input_file.unlink()
+                            logger.info(f"Successfully deleted input file: {input_file}")
+                        except Exception as e:
+                            logger.error(f"Error deleting input file (attempt {attempt + 1}): {e}")
+                            await asyncio.sleep(2)  # Увеличиваем время ожидания между попытками
+                    
+                    if output_file and output_file.exists():
+                        try:
+                            # Пробуем закрыть файл перед удалением
+                            import gc
+                            gc.collect()
+                            await asyncio.sleep(1)
+                            output_file.unlink()
+                            logger.info(f"Successfully deleted output file: {output_file}")
+                        except Exception as e:
+                            logger.error(f"Error deleting output file (attempt {attempt + 1}): {e}")
+                            await asyncio.sleep(2)  # Увеличиваем время ожидания между попытками
+                    
+                    # Если оба файла успешно удалены, выходим из цикла
+                    if (not input_file or not input_file.exists()) and (not output_file or not output_file.exists()):
+                        break
+                        
+                except Exception as e:
+                    logger.error(f"Error in cleanup attempt {attempt + 1}: {e}")
+                    await asyncio.sleep(2)
 
 
 async def request_back_main_menu(callback: types.CallbackQuery, state: FSMContext):

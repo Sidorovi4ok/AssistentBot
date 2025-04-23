@@ -16,8 +16,8 @@
         • preprocessor     - модуль для предобработки текста
 """
 
-from .logger       import logger, LoggerSetup
-from .preprocessor import preprocessor
+from .utils_logger         import logger, LoggerSetup
+from .utils_preprocessor   import preprocessor
+from .utils_file_processor import ExcelProcessor
 
-
-__all__ = ["logger", "LoggerSetup", "preprocessor"]
+__all__ = ["logger", "LoggerSetup", "preprocessor", "ExcelProcessor"]

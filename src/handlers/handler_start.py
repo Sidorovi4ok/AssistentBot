@@ -10,8 +10,8 @@
 """
 
 
-from aiogram          import types
-from src.utils.logger import logger
+from aiogram                  import types
+from src.utils                import logger
 
 
 async def start_handler(message: types.Message):

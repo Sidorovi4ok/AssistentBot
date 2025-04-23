@@ -23,7 +23,8 @@ from src.handlers.handler_request import (
     RequestStates, request_handler, receive_request,
     cancel_callback_handler, tables_callback_handler,
     request_text_menu, request_file_menu, request_get_example,
-    request_back_main_menu, request_close_menu
+    request_back_main_menu, request_close_menu, request_from_file,
+    handle_request_excel_file
     
 )
 
@@ -37,7 +38,8 @@ from src.handlers.handler_admin import (
     cmd_admin_handler, admin_logs_menu_callback_handler, admin_view_logs_callback_handler,
     admin_download_logs_callback_handler, admin_back_menu_callback_handler,
     admin_db_menu_callback_handler, admin_close_menu_callback_handler,
-    admin_get_users_callback_handler, admin_update_db_callback_handler
+    admin_get_users_callback_handler, admin_update_db_callback_handler,
+    admin_useful_button_callback_handler
 )
 
 # ──🛠 Менеджер-панель
@@ -88,27 +90,25 @@ def register_handlers(dp: Dispatcher):
 
 
     # Авторизация / Регистрация
-    dp.message.register(cmd_login,     Command(commands=["login"]))
-    dp.message.register(cmd_register,  Command(commands=["register"]))
+    dp.message.register(cmd_login,        Command(commands=["login"]))
+    dp.message.register(cmd_register,     Command(commands=["register"]))
     dp.message.register(process_login_inn,    AuthStates.waiting_for_inn_login)
     dp.message.register(process_register_inn, AuthStates.waiting_for_inn_register)
 
 
     # Запросы
-    dp.message.register(request_handler, Command(commands=["request"]), filter_only_auth)
-    dp.message.register(receive_request, RequestStates.waiting_for_request)
+    dp.message.register(request_handler,  Command(commands=["request"]))
+    dp.message.register(receive_request,                RequestStates.waiting_for_request,                                       filter_only_auth)
+    dp.message.register(handle_request_excel_file,      RequestStates.waiting_for_file,                                          filter_only_auth)
         
-    dp.callback_query.register(request_text_menu,                                      F.data.startswith("request_text_menu"),       filter_only_auth)
-    dp.callback_query.register(tables_callback_handler, RequestStates.choosing_list,   F.data.startswith("sheet_"),                  filter_only_auth)
-    
-    dp.callback_query.register(request_file_menu,                                      F.data.startswith("request_file_menu"),        filter_only_auth)
-    dp.callback_query.register(request_get_example,                                    F.data.startswith("request_get_example"),      filter_only_auth)
-    
-    dp.callback_query.register(request_back_main_menu,                                  F.data.startswith("request_back_main_menu"),  filter_only_auth)
-    dp.callback_query.register(request_close_menu,                                      F.data.startswith("request_close_menu"),      filter_only_auth)
-    
-    
-    dp.callback_query.register(cancel_callback_handler, F.data.startswith("cancel_")) 
+    dp.callback_query.register(request_text_menu,                                    F.data.startswith("request_text_menu"),      filter_only_auth)
+    dp.callback_query.register(tables_callback_handler, RequestStates.choosing_list, F.data.startswith("sheet_"),                 filter_only_auth)
+    dp.callback_query.register(request_file_menu,                                    F.data.startswith("request_file_menu"),      filter_only_auth)
+    dp.callback_query.register(request_from_file,                                    F.data.startswith("request_from_file"),      filter_only_auth)
+    dp.callback_query.register(request_get_example,                                  F.data.startswith("request_get_example"),    filter_only_auth)
+    dp.callback_query.register(request_back_main_menu,                               F.data.startswith("request_back_main_menu"), filter_only_auth)
+    dp.callback_query.register(request_close_menu,                                   F.data.startswith("request_close_menu"),     filter_only_auth)
+    dp.callback_query.register(cancel_callback_handler,                              F.data.startswith("cancel_"),                filter_only_auth) 
 
 
     # Менеджерские команды
@@ -131,8 +131,8 @@ def register_handlers(dp: Dispatcher):
     dp.message.register(handle_inn_user,                                ManagerPanelStates.waiting_for_inn,              filter_only_manager)
     dp.message.register(manager_change_type_handler,                    ManagerPanelStates.waiting_for_type,             filter_only_manager)
     
-    dp.callback_query.register(manager_wait_user_type_callback_handler, ManagerPanelStates.waiting_for_type_discount,   filter_only_manager)
-    dp.message.register(manager_wait_new_discount_callback_handler,     ManagerPanelStates.waiting_for_new_discount,    filter_only_manager)
+    dp.callback_query.register(manager_wait_user_type_callback_handler, ManagerPanelStates.waiting_for_type_discount,    filter_only_manager)
+    dp.message.register(manager_wait_new_discount_callback_handler,     ManagerPanelStates.waiting_for_new_discount,     filter_only_manager)
 
 
     # Админские команды
@@ -140,6 +140,7 @@ def register_handlers(dp: Dispatcher):
 
     dp.callback_query.register(admin_logs_menu_callback_handler,     F.data.startswith("menu_logs"),        filter_only_admin)
     dp.callback_query.register(admin_db_menu_callback_handler,       F.data.startswith("menu_db"),          filter_only_admin)
+    dp.callback_query.register(admin_useful_button_callback_handler, F.data.startswith("useful_button"),    filter_only_admin)
     dp.callback_query.register(admin_view_logs_callback_handler,     F.data.startswith("get_logs"),         filter_only_admin)
     dp.callback_query.register(admin_download_logs_callback_handler, F.data.startswith("download_logs"),    filter_only_admin)
     dp.callback_query.register(admin_get_users_callback_handler,     F.data.startswith("admin_get_users"),  filter_only_admin)
@@ -148,6 +149,6 @@ def register_handlers(dp: Dispatcher):
     dp.callback_query.register(admin_close_menu_callback_handler,    F.data.startswith("admin_close"),      filter_only_admin)
 
     # Если ни один обработчик не сработал
-    dp.message.register(unknown_message_handler)
+    #dp.message.register(unknown_message_handler)
 
 

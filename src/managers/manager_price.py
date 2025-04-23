@@ -66,7 +66,7 @@ class DataManager:
             self.filepath = os.path.join(filename)
 
             # Создание соединения с базой данных SQLite
-            self.engine = create_engine(f'sqlite:///{os.path.join("data", "db", "database.db")}')
+            self.engine = create_engine(f'sqlite:///{os.path.join("data", "db", "products.db")}')
             self.Session = sessionmaker(bind=self.engine)
 
             if not os.path.exists(self.filepath):

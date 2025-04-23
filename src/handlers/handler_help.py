@@ -12,7 +12,7 @@
 
 from aiogram                import types
 from aiogram.utils.markdown import hcode
-from src.utils.logger       import logger
+from src.utils       import logger
 
 
 async def help_handler(message: types.Message):

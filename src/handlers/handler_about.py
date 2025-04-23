@@ -10,7 +10,7 @@
 """
 
 from aiogram import types
-from src.utils.logger import logger
+from src.utils import logger
 
 
 async def about_handler(message: types.Message):

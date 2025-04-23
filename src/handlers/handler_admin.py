@@ -37,6 +37,7 @@ async def cmd_admin_handler(message: types.Message):
             [InlineKeyboardButton(text="📄 Управление логами",         callback_data="menu_logs")],
             [InlineKeyboardButton(text="👥 Управление базой данных",   callback_data="menu_db")],
             [InlineKeyboardButton(text="🤖 Перезагрузка бота",         callback_data="restart_bot")],
+            [InlineKeyboardButton(text="🪲 Debug кнопка",              callback_data="useful_button")],
             [InlineKeyboardButton(text="❌ Закрыть меню",              callback_data="admin_close")],
         ])
         await message.answer(
@@ -183,13 +184,37 @@ async def admin_update_db_callback_handler(callback: types.CallbackQuery):
             await callback.message.edit_text(
                 text="✅ База данных успешно обновлена",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu_db")]
+                    [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin_back")]
                 ])
             )
             await callback.answer()
         except Exception as e:
             logger.exception(f"ERROR in admin_update_db_callback_handler FOR user_id={callback.from_user.id}")
             await callback.answer(f"Ошибка: {str(e)}", show_alert=True)
+
+
+async def admin_useful_button_callback_handler(callback: types.CallbackQuery):
+    """
+        Этот обработчик обрабатывает callback useful_button для возвращения в полезной инфы для дебагга
+    """
+    if callback.data == "useful_button":
+        logger.info(f"Back admin menu by {callback.from_user.id}")
+        try:
+            await callback.message.edit_text(
+                text="""
+                    🪲 Полезная инфа для дебага:
+                    ССЫЛКИ:
+                    FastApiDocs - http://127.0.0.1:8000/docs\n
+                """,
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin_back")]
+                ])
+            )
+            await callback.answer()
+        except Exception as e:
+            logger.exception(f"ERROR in admin_back_menu_callback_handler FOR user_id={callback.from_user.id}")
+            await callback.answer(f"Ошибка: {str(e)}", show_alert=True)
+
 
 
 
@@ -205,6 +230,7 @@ async def admin_back_menu_callback_handler(callback: types.CallbackQuery):
                 [InlineKeyboardButton(text="📄 Управление логами",       callback_data="menu_logs")],
                 [InlineKeyboardButton(text="👥 Управление базой данных", callback_data="menu_db")],
                 [InlineKeyboardButton(text="🤖 Перезагрузка бота",       callback_data="restart_bot")],
+                [InlineKeyboardButton(text="🪲 Debug кнопка",            callback_data="useful_button")],
                 [InlineKeyboardButton(text="❌ Закрыть меню",            callback_data="admin_close")],
             ])
             await callback.message.edit_text(f"🛠 Админ-панель\nДобро пожаловать, {callback.from_user.first_name}!")
