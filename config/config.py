@@ -72,7 +72,7 @@ class UserConfig:
     @classmethod
     def from_env(cls) -> 'UserConfig':
         return cls(
-            managers = [804676300, 1900362240],
+            managers = [804676300, 1900362240, 1253055614],
             admins   = [6715041286, 804676300, 1900362240]
         )
 

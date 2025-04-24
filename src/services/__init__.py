@@ -11,13 +11,12 @@
     Основные компоненты:
         - RasaClient:    Клиент для взаимодействия с Rasa API
         - TextGenerator: Сервис генерации текста
+        - Speller:       Сервис проверки орфографии
 
 """
 
-from .rasa.client         import RasaClient
-from .llama.generation    import TextGenerator
+from .rasa.client            import RasaClient
+from .llama.generation       import TextGenerator
+from .speller.yandex_speller import speller
 
-__all__ = [
-    "RasaClient",
-    "TextGenerator",
-]
+__all__ = ["RasaClient", "TextGenerator", "speller"]

@@ -30,12 +30,15 @@ from aiogram.exceptions         import TelegramBadRequest
 from aiogram.fsm.context        import FSMContext
 from aiogram.utils.markdown     import hbold, hcode
 from src.managers.manager_user  import User
+from src.filters                import filter_only_manager, filter_only_auth
 
 from src.states import ManagerPanelStates
 
 
 async def cmd_manager_handler(message: types.Message):
     logger.info(f"Received MANAGER command FROM {message.from_user.id}")
+    if not (await filter_only_manager(message) and await filter_only_auth(message)):
+        return
     try:
         manager_main_menu_kb = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="👥 Управление пользователями", callback_data="manager_menu_users")],

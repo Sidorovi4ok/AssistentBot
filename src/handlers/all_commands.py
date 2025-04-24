@@ -112,7 +112,7 @@ def register_handlers(dp: Dispatcher):
 
 
     # Менеджерские команды
-    dp.message.register(cmd_manager_handler, Command(commands=["manager_panel"]), filter_only_manager)
+    dp.message.register(cmd_manager_handler, Command(commands=["manager_panel"]))
     
     dp.callback_query.register(manager_users_menu_callback_handler,       F.data.startswith("manager_menu_users"),       filter_only_manager)
     dp.callback_query.register(manager_products_menu_callback_handler,    F.data.startswith("manager_menu_products"),    filter_only_manager)
@@ -136,7 +136,7 @@ def register_handlers(dp: Dispatcher):
 
 
     # Админские команды
-    dp.message.register(cmd_admin_handler, Command(commands=["admin_panel"]), filter_only_admin)
+    dp.message.register(cmd_admin_handler, Command(commands=["admin_panel"]))
 
     dp.callback_query.register(admin_logs_menu_callback_handler,     F.data.startswith("menu_logs"),        filter_only_admin)
     dp.callback_query.register(admin_db_menu_callback_handler,       F.data.startswith("menu_db"),          filter_only_admin)
@@ -149,6 +149,6 @@ def register_handlers(dp: Dispatcher):
     dp.callback_query.register(admin_close_menu_callback_handler,    F.data.startswith("admin_close"),      filter_only_admin)
 
     # Если ни один обработчик не сработал
-    #dp.message.register(unknown_message_handler)
+    dp.message.register(unknown_message_handler)
 
 

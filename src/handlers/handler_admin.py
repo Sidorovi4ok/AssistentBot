@@ -22,6 +22,7 @@ from src.utils                 import logger
 from aiogram.types             import InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
 from aiogram.utils.markdown    import hbold, hcode
 from src.managers.manager_user import User
+from src.filters               import filter_only_admin
 
 
 
@@ -30,7 +31,8 @@ async def cmd_admin_handler(message: types.Message):
     """
         Этот обработчик обрабатывает команду /admin для вывода меню администратора системы
     """
-    
+    if not await filter_only_admin(message):
+        return
     logger.info(f"Received ADMIN command FROM {message.from_user.id}")
     try:
         admin_main_menu_kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -79,11 +81,19 @@ async def admin_view_logs_callback_handler(callback: types.CallbackQuery):
     if callback.data == "get_logs":
         logger.info(f"Get logs by {callback.from_user.id}")
         try:
-            with open("logs/main.log", "r") as f:
-                await (callback.message.edit_text(
-               f"<b>Последние логи в системе:</b>\n<code>{''.join(f.readlines()[-25:])}</code>",
+            with open("logs/main.log", "r", encoding='utf-8') as f:
+                # Read last 25 lines and escape HTML characters
+                log_lines = f.readlines()[-25:]
+                escaped_logs = []
+                for line in log_lines:
+                    # Replace < and > with HTML entities
+                    escaped_line = line.replace('<', '&lt;').replace('>', '&gt;')
+                    escaped_logs.append(escaped_line)
+                
+                await callback.message.edit_text(
+                    f"<b>Последние логи в системе:</b>\n<code>{''.join(escaped_logs)}</code>",
                     parse_mode="HTML"
-                ))
+                )
                 admin_logs_menu_kb = InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu_logs")],
                 ])
@@ -201,11 +211,12 @@ async def admin_useful_button_callback_handler(callback: types.CallbackQuery):
         logger.info(f"Back admin menu by {callback.from_user.id}")
         try:
             await callback.message.edit_text(
-                text="""
-                    🪲 Полезная инфа для дебага:
-                    ССЫЛКИ:
-                    FastApiDocs - http://127.0.0.1:8000/docs\n
-                """,
+                text = (
+                    "🪲 <b>Полезная инфа для дебага:</b>\n\n"
+                    
+                    "ССЫЛКИ:\n"
+                    "• FastApiDocs - http://127.0.0.1:8000/docs\n\n"
+                ),
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin_back")]
                 ])

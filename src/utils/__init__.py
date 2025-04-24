@@ -14,6 +14,7 @@
         • logger           - модуль логирования с настройкой через logger
         • LoggerSetup      - модуль настройки и создания нового logger
         • preprocessor     - модуль для предобработки текста
+        • ExcelProcessor   - модуль для обработки Excel-файлов
 """
 
 from .utils_logger         import logger, LoggerSetup

@@ -11,6 +11,7 @@
     Состояния:
         • choosing_list       - Ожидание выбора нужной таблицы для поиска
         • waiting_for_request - Ожидание ввода поискового запроса
+        • waiting_for_file    - Ожидание загрузки файла
 """
 
 from aiogram.fsm.state import State, StatesGroup

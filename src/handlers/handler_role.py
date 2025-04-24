@@ -9,12 +9,16 @@
         и связанных с ним привилегиях (например, скидках).
 """
 
-from aiogram import types
+from aiogram     import types
+from src.filters import filter_only_auth
 
 async def role_handler(message: types.Message):
     """
         Обработчик команды /role.
     """
+    if not await filter_only_auth(message):
+        return
+    
     user = message.bot.um.get_user_by_telegram(message.from_user.id)
 
     if user.user_type == 1:

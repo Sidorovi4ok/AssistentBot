@@ -106,15 +106,12 @@ async def parse_query(request: QueryRequest):
         Обработка текстового запроса
     """
     try:
-        # Получение результата от Rasa
         result = await agent.parse_message(request.text)
         
-        # Извлечение намерения и уверенности
         intent_data = result.get("intent", {})
         intent      = intent_data.get("name", "unknown")
         confidence  = intent_data.get("confidence", 0.0)
         
-        # Извлечение сущностей
         entities = {
             e.get("entity"): e.get("value") 
             for e in result.get("entities", [])

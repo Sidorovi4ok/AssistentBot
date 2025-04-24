@@ -18,10 +18,8 @@
 import sys
 import json
 import aiohttp
-from pathlib   import Path
-from typing    import Optional, Dict, Any
 
-sys.path.append(str(Path(__file__).parent.parent.parent.parent))
+from typing    import Optional, Dict, Any
 from config    import config
 from src.utils import logger
 
