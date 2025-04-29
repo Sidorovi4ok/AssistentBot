@@ -210,8 +210,15 @@ async def receive_request(message: types.Message, state: FSMContext):
                 # Преобразуем в JSON для лучшей читаемости
                 formatted_json = json.dumps(formatted_data, ensure_ascii=False, indent=2)
                 
+                request_kb = InlineKeyboardMarkup(
+                    inline_keyboard= [
+                        [InlineKeyboardButton(text="📗 Сформировать файл-счет", callback_data="test1")],
+                        [InlineKeyboardButton(text="📘 Сформировать файл-кп", callback_data="test2")]
+                    ]
+                )
+                
                 generated_text = await text_generator.generate_text(message.text, formatted_json)
-                await message.answer(generated_text)
+                await message.answer(text=generated_text, reply_markup=request_kb)
         else:
             await message.answer("🔍 По вашему запросу ничего не найдено.")
             return
