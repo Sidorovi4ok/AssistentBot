@@ -13,6 +13,7 @@ from pathlib import Path
 import asyncio
 from datetime import datetime
 import json
+from html import escape
 
 from aiogram                   import types
 from aiogram.fsm.context       import FSMContext
@@ -182,9 +183,12 @@ async def receive_request(message: types.Message, state: FSMContext):
                 product_dict = product_data.to_dict()
                 found_products.append(product_dict)
                 print(product_dict)
-
+            
             with pd.option_context('display.max_rows', None):
                 result_df = pd.DataFrame(found_products)
+                
+            # Сохраняем найденные товары в состоянии
+            await state.update_data(found_products=found_products)
             
             # Используем контекстный менеджер для TextGenerator
             async with TextGenerator() as text_generator:
@@ -210,10 +214,13 @@ async def receive_request(message: types.Message, state: FSMContext):
                 # Преобразуем в JSON для лучшей читаемости
                 formatted_json = json.dumps(formatted_data, ensure_ascii=False, indent=2)
                 
+                # Перед вызовом create_pdf_from_dataframe
+                logger.debug(f"DataFrame before PDF creation:\n{result_df.to_string()}")
+
                 request_kb = InlineKeyboardMarkup(
                     inline_keyboard= [
-                        [InlineKeyboardButton(text="📗 Сформировать файл-счет", callback_data="test1")],
-                        [InlineKeyboardButton(text="📘 Сформировать файл-кп", callback_data="test2")]
+                        [InlineKeyboardButton(text="📗 Сформировать файл-счет", callback_data="file_creation_1")],
+                        [InlineKeyboardButton(text="📘 Сформировать файл-кп", callback_data="file_creation_2")]
                     ]
                 )
                 
@@ -435,6 +442,69 @@ async def request_close_menu(callback: types.CallbackQuery, state: FSMContext):
             logger.exception(f"ERROR in request_close_menu FOR user_id={callback.from_user.id}")
             await callback.answer(f"Ошибка: {str(e)}", show_alert=True)
         
+
+async def handle_file_creation(callback: types.CallbackQuery, state: FSMContext):
+    user_data = await state.get_data()
+    found_products = user_data.get('found_products', [])
+    
+    if not found_products:
+        await callback.answer("Нет данных для создания файла")
+        return
+    
+    output_file = None
+    try:
+        # Создаем временный файл
+        temp_dir = Path("data/excel/requests_files")
+        temp_dir.mkdir(exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        if callback.data == "file_creation_1":
+            file_type = "счет"
+            output_file = temp_dir / f"result_{timestamp}_{file_type}.pdf"
+        else:
+            file_type = "кп"
+            output_file = temp_dir / f"result_{timestamp}_{file_type}.xlsx"
+        
+        # Создаем DataFrame из найденных товаров
+        df = pd.DataFrame(found_products)
+        
+        # Перед вызовом create_pdf_from_dataframe
+        logger.debug(f"DataFrame before PDF creation:\n{df.to_string()}")
+        
+        # Обрабатываем файл
+        processor = ExcelProcessor()
+        
+        if callback.data == "file_creation_1":
+            success, error_message = await processor.create_pdf_from_dataframe(df, str(output_file))
+        else:
+            success, error_message = await processor.process_dataframe_async(df, str(output_file))
+        
+        if success:
+            # Отправляем файл пользователю
+            await callback.message.answer_document(
+                document=FSInputFile(output_file),
+                caption=f"✅ Файл-{file_type} успешно создан"
+            )
+        else:
+            # Экранируем HTML-символы в сообщении об ошибке
+            safe_error_message = escape(error_message)
+            await callback.message.answer(f"❌ Ошибка при создании файла: {safe_error_message}")
+            
+    except Exception as e:
+        logger.exception(f"Error creating file: {e}")
+        # Экранируем HTML-символы в сообщении об ошибке
+        safe_error = escape(str(e))
+        await callback.message.answer(f"❌ Произошла ошибка при создании файла: {safe_error}")
+    finally:
+        # Удаляем временный файл после отправки
+        if output_file and output_file.exists():
+            try:
+                await asyncio.sleep(2)  # Даем время на завершение отправки файла
+                output_file.unlink()
+                logger.info(f"Удален временный файл: {output_file}")
+            except Exception as e:
+                logger.error(f"Ошибка при удалении временного файла: {e}")
+        await callback.answer()
 
 
 

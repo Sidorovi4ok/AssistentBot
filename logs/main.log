@@ -1,0 +1,5 @@
+2025-04-23 09:59:35 - app - INFO - Bot is starting
+2025-04-23 09:59:44 - app - INFO - ✓ Rasa NLU API доступен и работает
+2025-04-23 09:59:44 - app - INFO - Starting polling2025-04-29 14:09:04 - app - INFO - Bot is starting
+2025-04-29 14:09:47 - app - ERROR - ❌ Rasa NLU API недоступен: Cannot connect to host localhost:8000 ssl:default [Удаленный компьютер отклонил это сетевое подключение]
+2025-04-29 14:09:47 - app - INFO - Bot stopped

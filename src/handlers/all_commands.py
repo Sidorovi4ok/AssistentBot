@@ -24,7 +24,7 @@ from src.handlers.handler_request import (
     cancel_callback_handler, tables_callback_handler,
     request_text_menu, request_file_menu, request_get_example,
     request_back_main_menu, request_close_menu, request_from_file,
-    handle_request_excel_file
+    handle_request_excel_file, handle_file_creation
     
 )
 
@@ -98,8 +98,8 @@ def register_handlers(dp: Dispatcher):
 
     # Запросы
     dp.message.register(request_handler,  Command(commands=["request"]))
-    dp.message.register(receive_request,                RequestStates.waiting_for_request,                                       filter_only_auth)
-    dp.message.register(handle_request_excel_file,      RequestStates.waiting_for_file,                                          filter_only_auth)
+    dp.message.register(receive_request,                RequestStates.waiting_for_request,                                        filter_only_auth)
+    dp.message.register(handle_request_excel_file,      RequestStates.waiting_for_file,                                           filter_only_auth)
         
     dp.callback_query.register(request_text_menu,                                    F.data.startswith("request_text_menu"),      filter_only_auth)
     dp.callback_query.register(tables_callback_handler, RequestStates.choosing_list, F.data.startswith("sheet_"),                 filter_only_auth)
@@ -109,7 +109,7 @@ def register_handlers(dp: Dispatcher):
     dp.callback_query.register(request_back_main_menu,                               F.data.startswith("request_back_main_menu"), filter_only_auth)
     dp.callback_query.register(request_close_menu,                                   F.data.startswith("request_close_menu"),     filter_only_auth)
     dp.callback_query.register(cancel_callback_handler,                              F.data.startswith("cancel_"),                filter_only_auth) 
-
+    dp.callback_query.register(handle_file_creation,                                 F.data.startswith("file_creation_"),         filter_only_auth)
 
     # Менеджерские команды
     dp.message.register(cmd_manager_handler, Command(commands=["manager_panel"]))

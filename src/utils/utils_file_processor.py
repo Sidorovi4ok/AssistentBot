@@ -26,8 +26,16 @@ from src.managers    import EmbeddingManager, DataManager
 from src.utils       import preprocessor
 from src.utils       import logger
 
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
-
+# Регистрируем шрифты с поддержкой кириллицы
+pdfmetrics.registerFont(TTFont('Arial', 'arial.ttf'))
+pdfmetrics.registerFont(TTFont('Arial-Bold', 'arialbd.ttf'))  # Жирный шрифт
 
 class AsyncCache:
     """
@@ -492,3 +500,152 @@ class ExcelProcessor:
             cell.border = thin_border
 
         wb.save(output_file)
+
+    async def process_dataframe_async(self, df: pd.DataFrame, output_file: str) -> tuple[bool, str]:
+        """
+            Асинхронная обработка DataFrame и создание выходного файла
+        """
+        try:
+            await self._update_progress(0.1)
+            
+            # Проверяем наличие необходимых колонок
+            required_columns = ['Наименование', 'Цена с НДС', 'Описание']
+            for col in required_columns:
+                if col not in df.columns:
+                    return False, f"Отсутствует обязательная колонка: {col}"
+            
+            # Сохраняем DataFrame в Excel
+            def save_excel():
+                # Используем стандартный метод to_excel
+                df.to_excel(output_file, index=False)
+                
+                # Базовое форматирование с помощью openpyxl
+                from openpyxl import load_workbook
+                from openpyxl.styles import Font, Alignment, Border, Side
+                
+                wb = load_workbook(output_file)
+                ws = wb.active
+                
+                # Форматируем заголовки
+                for cell in ws[1]:
+                    cell.font = Font(bold=True)
+                    cell.alignment = Alignment(horizontal='center', vertical='center')
+                    cell.border = Border(
+                        left=Side(style='thin'),
+                        right=Side(style='thin'),
+                        top=Side(style='thin'),
+                        bottom=Side(style='thin')
+                    )
+                
+                # Форматируем ячейки
+                for row in ws.iter_rows(min_row=2):
+                    for cell in row:
+                        cell.alignment = Alignment(wrap_text=True, vertical='top')
+                        cell.border = Border(
+                            left=Side(style='thin'),
+                            right=Side(style='thin'),
+                            top=Side(style='thin'),
+                            bottom=Side(style='thin')
+                        )
+                
+                # Автоматически подгоняем ширину колонок
+                for col in ws.columns:
+                    max_length = 0
+                    column = col[0].column_letter
+                    for cell in col:
+                        try:
+                            if len(str(cell.value)) > max_length:
+                                max_length = len(str(cell.value))
+                        except:
+                            pass
+                    adjusted_width = (max_length + 2) * 1.2
+                    ws.column_dimensions[column].width = adjusted_width
+                
+                wb.save(output_file)
+            
+            await asyncio.to_thread(save_excel)
+            
+            await self._update_progress(1.0)
+            return True, "Файл успешно создан"
+        except Exception as e:
+            logger.exception("Error in process_dataframe_async")
+            return False, f"Ошибка при создании файла: {str(e)}"
+
+    async def create_pdf_from_dataframe(self, df: pd.DataFrame, output_file: str) -> tuple[bool, str]:
+        """
+            Создание PDF файла из DataFrame
+        """
+        try:
+            # Функция для очистки и проверки данных
+            def clean_and_validate_data(value):
+                if pd.isna(value):
+                    return ""
+                
+                # Преобразуем в строку
+                value = str(value)
+                
+                # Убираем непечатаемые символы
+                value = ''.join(char for char in value if char.isprintable())
+                
+                # Убираем лишние пробелы
+                value = " ".join(value.strip().split())
+                
+                # Проверяем, что строка не состоит только из повторяющихся символов
+                if len(set(value)) == 1 and len(value) > 3:
+                    return ""
+                    
+                return value
+            
+            # Применяем очистку ко всем данным
+            df = df.map(clean_and_validate_data)
+            
+            # Удаляем пустые строки
+            df = df.replace("", pd.NA).dropna(how='all')
+            
+            if df.empty:
+                return False, "Нет данных для создания PDF"
+            
+            # Создаем PDF документ
+            pdf = SimpleDocTemplate(
+                output_file,
+                pagesize=A4,
+                rightMargin=30,
+                leftMargin=30,
+                topMargin=30,
+                bottomMargin=30
+            )
+            
+            # Настройка стилей для русского текста
+            styles = getSampleStyleSheet()
+            styles['Normal'].fontName = 'Arial'  # Используем зарегистрированный шрифт
+            styles['Normal'].encoding = 'UTF-8'
+            
+            # Подготавливаем данные для таблицы
+            data = [df.columns.tolist()] + df.values.tolist()
+            
+            # Создаем таблицу
+            table = Table(data)
+            
+            # Применяем стили к таблице
+            style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Arial-Bold'),  # Используем Arial-Bold для заголовков
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ])
+            
+            table.setStyle(style)
+            
+            # Добавляем таблицу в документ
+            elements = [table]
+            pdf.build(elements)
+            
+            return True, "PDF файл успешно создан"
+        except Exception as e:
+            logger.exception("Error in create_pdf_from_dataframe")
+            return False, f"Ошибка при создании PDF файла: {str(e)}"
